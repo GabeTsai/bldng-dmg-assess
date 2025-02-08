@@ -9,8 +9,11 @@ from dotenv import load_dotenv
 from config.constants import TILE_WIDTH, MAX_RATIO
 import os
 
-load_dotenv('../config.env')
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(env_path)
+
 SAR_DATA_FOLDER = os.getenv('SAR_DATA_FOLDER')
+GHSL_DATA_FOLDEr = os.getenv('GHSL_DATA_FOLDER')
 GHSL_PREFIX = os.getenv('GHSL_PREFIX')
 PATCH_FOLDER = os.getenv('PATCH_DATA_FOLDER')
 
