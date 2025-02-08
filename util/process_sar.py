@@ -12,6 +12,7 @@ import os
 load_dotenv('../config.env')
 SAR_DATA_FOLDER = os.getenv('SAR_DATA_FOLDER')
 GHSL_PREFIX = os.getenv('GHSL_PREFIX')
+PATCH_FOLDER = os.getenv('PATCH_DATA_FOLDER')
 
 def find_ghsl_tile(lon, lat):
     
@@ -168,15 +169,16 @@ def cut_patches(img, img_name, dir, patch_size = 256, max_ratio = MAX_RATIO):
 def main():
     years = [2020, 2021, 2022, 2023, 2024, 2025]
     for year in years:
-        sar_images = os.listdir(f'{SAR_DATA_FOLDER}/{year}')
-        for img_name in sar_images:
-            img_path = f'{SAR_DATA_FOLDER}/{year}/{img_name}'
-            img = rasterio.open(img_path)
-            masks = make_masks(img)
-            total_percent = check_buildings_present(masks)
-            print(f"Total building coverage: {total_percent}")
-            cut_patches(img, img_name, f'{SAR_DATA_FOLDER}/{year}_patches')
-            img.close()
+        dir_names = os.listdir(f'{SAR_DATA_FOLDER}/{year}')
+        for dir_name in dir_names:
+            if 'geo' in dir_name.lower():
+                img_path = f'{SAR_DATA_FOLDER}/{year}/{dir_name}/{dir_name}.tif'
+                img = rasterio.open(img_path)
+                masks = make_masks(img)
+                total_percent = check_buildings_present(masks)
+                print(f"Total building coverage: {total_percent}")
+                cut_patches(img, dir_name, f'{SAR_DATA_FOLDER}/sar_patches')
+                img.close()
 
 if __name__ == '__main__':
     main()
