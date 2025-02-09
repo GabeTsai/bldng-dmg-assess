@@ -6,7 +6,7 @@ from rasterio.windows import Window
 from skimage import exposure
 import numpy as np
 from dotenv import load_dotenv
-from config.constants import TILE_WIDTH, MAX_RATIO, BUILDINGS_THRESHOLD
+from config.constants import TILE_WIDTH, MAX_RATIO, BUILDINGS_THRESHOLD, MIN_BUILDING_COVG
 import os
 
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
@@ -14,6 +14,7 @@ load_dotenv(env_path)
 
 SAR_DATA_FOLDER = os.getenv('SAR_DATA_FOLDER')
 GHSL_DATA_FOLDER = os.getenv('GHSL_DATA_FOLDER')
+DATA_FOLDER = os.getenv('DATA_FOLDER')
 GHSL = os.getenv('GHSL')
 PATCH_FOLDER = os.getenv('PATCH_DATA_FOLDER')
 
@@ -85,6 +86,8 @@ def cut_patches(img, img_name, dir, patch_size = 256, max_ratio = MAX_RATIO):
 def main():
     years = [2020, 2021, 2022, 2023, 2024, 2025]
     ghsl_path = f'{GHSL_DATA_FOLDER}/{GHSL}'
+    
+    print('Processing SAR images')
     for year in years:
         dir_names = os.listdir(f'{SAR_DATA_FOLDER}/{year}')
         for dir_name in dir_names:
@@ -92,8 +95,9 @@ def main():
                 img_path = f'{SAR_DATA_FOLDER}/{year}/{dir_name}/{dir_name}.tif'
                 sar = rasterio.open(img_path)
                 building_ratio = detect_buildings(ghsl_path, sar, threshold = BUILDINGS_THRESHOLD)
-                print(f"Total building coverage: {building_ratio}")
-                cut_patches(sar, dir_name, f'{SAR_DATA_FOLDER}/sar_patches')
+                print(f"Total building coverage for {dir_name}: {building_ratio}")
+                if building_ratio >= MIN_BUILDING_COVG:
+                    cut_patches(sar, dir_name, f'{DATA_FOLDER}/sar_patches')
                 sar.close()
 
 if __name__ == '__main__':
