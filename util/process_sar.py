@@ -6,7 +6,7 @@ from rasterio.windows import Window
 from skimage import exposure
 import numpy as np
 from dotenv import load_dotenv
-from config.constants import TILE_WIDTH, MAX_RATIO, BUILDINGS_THRESHOLD, MIN_BUILDING_COVG
+from config.constants import *
 import os
 
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
@@ -25,9 +25,9 @@ def detect_buildings(ghsl_path, sar, threshold = BUILDINGS_THRESHOLD):
 
         window = from_bounds(*wgs84_bounds, ghsl.transform)
 
-        ghsl_subset = ghsl.read(1, window=window)
+        ghsl_subset = ghsl.read(1, window=window, out_shape = (sar.height, sar.width))
 
-        ghsl_resampled = np.zeros((sar.height, sar.width), dtype = np.float32)
+        ghsl_resampled = np.zeros((sar.height, sar.width), dtype = np.uint16)
 
         # Reproject GHSL subset to match SAR image
         reproject(
@@ -53,18 +53,18 @@ def contrast_stretch(img, lower_percent=0.1, upper_percent=99.5, gamma = 1.8):
     # Clip pixel values based on lower/upper percentiles (exclude extreme pixel values)
     lower, upper = np.percentile(img, (lower_percent, upper_percent))
     # Apply contrast stretch
-    new_img = exposure.rescale_intensity(img, in_range=(lower, upper))
+    img = exposure.rescale_intensity(img, in_range=(lower, upper))
     # Apply CLAHE - tile the image and apply contrast stretching on each tile (local contrast stretching)
-    eq_img = exposure.equalize_adapthist(new_img, clip_limit=0.03)
+    img = exposure.equalize_adapthist(img, clip_limit=0.03)
     # Make image a bit darker
-    gamma_cor_img = exposure.adjust_gamma(eq_img, gamma)
-    return gamma_cor_img
+    img = exposure.adjust_gamma(img, gamma)
+    return img
 
 def too_black(patch, max_ratio = MAX_RATIO):
     black_ratio = np.sum(patch == 0) /patch.size
     return black_ratio > max_ratio
 
-def cut_patches(img, img_name, dir, patch_size = 256, max_ratio = MAX_RATIO):
+def cut_patches(img, img_name, dir, patch_size = PATCH_SIZE, max_ratio = MAX_RATIO):
     img_width, img_height = img.shape
 
     for i in range(0, img_height, patch_size):
