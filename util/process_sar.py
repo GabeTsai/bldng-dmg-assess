@@ -13,6 +13,15 @@ import psutil
 import logging
 import sys
 
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(env_path)
+
+SAR_DATA_FOLDER = os.getenv('SAR_DATA_FOLDER')
+GHSL_DATA_FOLDER = os.getenv('GHSL_DATA_FOLDER')
+DATA_FOLDER = os.getenv('DATA_FOLDER')
+GHSL = os.getenv('GHSL')
+PATCH_FOLDER = os.getenv('PATCH_DATA_FOLDER')
+
 # Set up logging
 logging.basicConfig(
     level=logging.DEBUG,
