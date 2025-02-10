@@ -41,9 +41,33 @@ def detect_buildings(ghsl_path, sar, threshold = BUILDINGS_THRESHOLD):
 
         window = from_bounds(*wgs84_bounds, ghsl.transform)
 
-        ghsl_subset = ghsl.read(1, window=window, out_shape = (sar.height, sar.width))
         logging.info(f"After GHSL read - Memory: {get_memory_mb():.0f}MB")
+        
+        window_size_gb = (window.width * window.height * 2) / (1024 * 1024 * 1024)  # assuming uint16
+        logging.info(f"Estimated window size: {window_size_gb:.2f}GB")
 
+        if window_size_gb > 1.0:  # If window would be larger than 1GB
+            logging.info("Large window detected - reading in chunks")
+            # Read in chunks of 10000 rows
+            chunk_height = 10000
+            chunks = []
+            
+            for row_start in range(0, window.height, chunk_height):
+                chunk_window = Window(window.col_off, 
+                                   window.row_off + row_start,
+                                   window.width,
+                                   min(chunk_height, window.height - row_start))
+                                   
+                logging.info(f"Reading chunk at row {row_start}/{window.height} - Memory: {get_memory_mb():.0f}MB")
+                chunk = ghsl.read(1, window=chunk_window)
+                chunks.append(chunk)
+                
+            ghsl_subset = np.vstack(chunks)
+            del chunks
+            gc.collect()
+        else:
+            ghsl_subset = ghsl.read(1, window=window)
+        
         ghsl_resampled = np.zeros((sar.height, sar.width), dtype = np.uint16)
 
         # Reproject GHSL subset to match SAR image
