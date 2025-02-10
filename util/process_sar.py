@@ -60,9 +60,9 @@ def contrast_stretch(img, lower_percent=0.1, upper_percent=99.5, gamma = 1.8):
     img = exposure.adjust_gamma(img, gamma)
     return img
 
-def too_black(patch, max_ratio = MAX_RATIO):
-    black_ratio = np.sum(patch == 0) /patch.size
-    return black_ratio > max_ratio
+def too_much_one_col(patch, max_ratio = MAX_RATIO):
+    unique, counts = np.unique(patch.flatten(), return_counts = True)
+    return np.max(counts) / patch.size > max_ratio
 
 def cut_patches(img, img_name, dir, patch_size = PATCH_SIZE, max_ratio = MAX_RATIO):
     img_width, img_height = img.shape
@@ -76,7 +76,7 @@ def cut_patches(img, img_name, dir, patch_size = PATCH_SIZE, max_ratio = MAX_RAT
                                        (0, patch_size - patch.shape[1])), mode='constant', constant_values=0)
                 
             # If patch doesn't have too many black pixels, add it to the list
-            if np.sum(patch == 0) / patch.size < max_ratio:
+            if not too_much_one_col(patch, max_ratio):
                 # Save patch to disk
                 patch_path = f'{dir}/{img_name}_patch_{i}_{j}.tif'
                 patch = contrast_stretch(patch)
