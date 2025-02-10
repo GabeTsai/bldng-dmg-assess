@@ -8,6 +8,7 @@ import numpy as np
 from dotenv import load_dotenv
 from config.constants import *
 import os
+import gc 
 
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(env_path)
@@ -75,16 +76,18 @@ def cut_patches(img, img_name, dir, patch_size = PATCH_SIZE, max_ratio = MAX_RAT
                 patch = np.pad(patch, ((0, patch_size - patch.shape[0]), 
                                        (0, patch_size - patch.shape[1])), mode='constant', constant_values=0)
                 
-            # If patch doesn't have too many black pixels, add it to the list
-            if not too_much_one_col(patch, max_ratio):
+            # If patch doesn't have too many of one pixel, add it to the list
+            if np.sum(patch == 0) / patch.size < max_ratio:
                 # Save patch to disk
                 patch_path = f'{dir}/{img_name}_patch_{i}_{j}.tif'
                 patch = contrast_stretch(patch)
                 with rasterio.open(patch_path, 'w', driver='GTiff', width=patch_size, height=patch_size, count=1, dtype=img.dtypes[0], crs=img.crs, transform=img.window_transform(window)) as dst:
                     dst.write(patch, 1)
+    gc.collect()    
 
 def main():
     years = [2020, 2021, 2022, 2023, 2024, 2025]
+    years = [2023, 2024, 2025]
     ghsl_path = f'{GHSL_DATA_FOLDER}/{GHSL}'
     
     print('Processing SAR images')
@@ -99,6 +102,7 @@ def main():
                 if building_ratio >= MIN_BUILDING_COVG:
                     cut_patches(sar, dir_name, f'{DATA_FOLDER}/sar_patches')
                 sar.close()
+ 
 
 if __name__ == '__main__':
     main()
