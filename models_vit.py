@@ -20,9 +20,9 @@ import timm.models.vision_transformer
 class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
     """ Vision Transformer with support for global average pooling
     """
-    def __init__(self, global_pool=False, **kwargs):
+    def __init__(self, img_size = 512, global_pool=False, **kwargs):
         super(VisionTransformer, self).__init__(**kwargs)
-
+        self.set_input_size(img_size = img_size)
         self.global_pool = global_pool
         if self.global_pool:
             norm_layer = kwargs['norm_layer']
@@ -33,8 +33,8 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
 
     def forward_features(self, x):
         B = x.shape[0]
-        x = self.patch_embed(x)
-
+        x = self.patch_embed(x) # Embed patches into vectors
+        
         cls_tokens = self.cls_token.expand(B, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
         x = torch.cat((cls_tokens, x), dim=1)
         x = x + self.pos_embed
@@ -66,9 +66,20 @@ def vit_large_patch16(**kwargs):
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
-
 def vit_huge_patch14(**kwargs):
     model = VisionTransformer(
         patch_size=14, embed_dim=1280, depth=32, num_heads=16, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
+
+def main():
+    model = vit_base_patch16()
+    test = torch.rand(1, 3, 512, 512)
+    model.eval()
+    with torch.no_grad():
+        output = model(test)
+    print(output.shape)
+
+if __name__ == "__main__":
+    main()
+    
