@@ -142,9 +142,10 @@ def cut_patches(img, img_name, dir, patch_size = PATCH_SIZE, max_ratio = MAX_RAT
                 del patch
     gc.collect()    
 
-def main():
+
+def process_sar():
     years = [2020, 2021, 2022, 2023, 2024, 2025]
-    years = [2023, 2024, 2025]
+
     ghsl_path = f'{GHSL_DATA_FOLDER}/{GHSL}'
     
     print('Processing SAR images')
@@ -165,6 +166,8 @@ def main():
                 gc.collect()
                 logging.info(f"Final memory: {get_memory_mb():.0f}MB")
  
+def main():
+    pass
 
 if __name__ == '__main__':
     main()
