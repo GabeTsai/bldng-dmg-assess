@@ -10,16 +10,50 @@
 
 import os
 import PIL
-
+import re
+import cv2
+from tqdm import tqdm
 from torchvision import datasets, transforms
 
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 
-FMOW_PATH = os.environ['FMOW_PATH']
+FMOW_PATH = os.getenv('FMOW_PATH')
+PATCH_SIZE = os.getenv('PATCH_SIZE')
 
-def build_fmow_dataset(fmow_path):
-    pass
+def cut_patches(img, data_dir, img_name, patch_size, save_perc):
+    h, w, _ = img.shape
+    count = 0
+    num_saved = 0
+    for i in tqdm(range(0, h, patch_size)):
+        for j in tqdm(range(0, w, patch_size), leave = False):
+            patch = img[i:i+patch_size, j:j+patch_size]
+            if patch.shape == (patch_size, patch_size, 3) and count % int(1/save_perc) == 0:
+                patch_name = f"{img_name}_{i}_{j}.jpg"
+                patch_path = os.path.join(data_dir, patch_name)
+                cv2.imwrite(patch_path, patch)
+            count += 1
+
+def build_fmow_dataset(fmow_path, data_dir, patch_size = PATCH_SIZE, save_perc = 0.1):
+    """
+    Cut 512x512 and copy image patches from fmow dataset to data_dir
+    """
+    # airport, crop_field, etc...
+    categories = os.listdir(fmow_path)
+    for cat in categories:
+        cat_path = os.path.join(fmow_path, cat)
+        cat_folders = os.listdir(cat_path)
+        # airport_0, airport_1 ...
+        for cat_folder in cat_folders:
+            cat_folder_path = os.path.join(cat_path, cat_folder)
+            cat_folder_data = os.listdir(cat_folder_path)
+            # airport_0_0.jpg, airport_0_1.jpg ...
+            for img_name in cat_folder_data:
+                img_path = os.path.join(cat_folder_path, img_name)
+                if re.search(r"\.jpg$", img_path, re.IGNORECASE):
+                    img = cv2.imread(img_path)
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    cut_patches(img, data_dir, img_name, patch_size, save_perc)    
 
 def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
@@ -69,7 +103,9 @@ def build_transform(is_train, args):
     return transforms.Compose(t)
 
 def main():
-    pass
+    fmow_path = '/Users/HP/Documents/GitHub/bldng-dmg-assess/data/fmow_test'
+    data_dir = '/Users/HP/Documents/GitHub/bldng-dmg-assess/data/fmow_data'
+    build_fmow_dataset(fmow_path, data_dir, 512, )
 
 if __name__ == "__main__":
     main()
