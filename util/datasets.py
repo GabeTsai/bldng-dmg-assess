@@ -16,6 +16,10 @@ from torchvision import datasets, transforms
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 
+FMOW_PATH = os.environ['FMOW_PATH']
+
+def build_fmow_dataset(fmow_path):
+    pass
 
 def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
@@ -63,3 +67,9 @@ def build_transform(is_train, args):
     t.append(transforms.ToTensor())
     t.append(transforms.Normalize(mean, std))
     return transforms.Compose(t)
+
+def main():
+    pass
+
+if __name__ == "__main__":
+    main()
