@@ -131,7 +131,7 @@ def cut_patches(img, img_name, dir, patch_size = PATCH_SIZE, max_ratio = MAX_RAT
                 # Save patch to disk
                 patch_path = f'{dir}/{img_name}_patch_{i}_{j}.tif'
                 patch = contrast_stretch(patch)
-                with rasterio.open(patch_path, 'w', driver='GTiff', width=patch_size, height=patch_size, count=1, dtype=img.dtypes[0], crs=img.crs, transform=img.window_transform(window)) as dst:
+                with rasterio.open(patch_path, 'w', driver='GTiff', width=patch_size, height=patch_size, count=1, dtype=np.float32, crs=img.crs, transform=img.window_transform(window)) as dst:
                     dst.write(patch, 1)
                 
                 patches_processed += 1
@@ -144,7 +144,6 @@ def cut_patches(img, img_name, dir, patch_size = PATCH_SIZE, max_ratio = MAX_RAT
 
 def main():
     years = [2020, 2021, 2022, 2023, 2024, 2025]
-    years = [2023, 2024, 2025]
     ghsl_path = f'{GHSL_DATA_FOLDER}/{GHSL}'
     
     print('Processing SAR images')
