@@ -21,20 +21,20 @@ from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 FMOW_PATH = os.getenv('FMOW_PATH')
 PATCH_SIZE = os.getenv('PATCH_SIZE')
 
-def cut_patches(img, data_dir, img_name, patch_size):
+def cut_patches(img, data_dir, img_name, patch_size, save_perc):
     h, w, _ = img.shape
     count = 0
+    num_saved = 0
     for i in tqdm(range(0, h, patch_size)):
         for j in tqdm(range(0, w, patch_size), leave = False):
             patch = img[i:i+patch_size, j:j+patch_size]
-            if patch.shape == (patch_size, patch_size, 3):
+            if patch.shape == (patch_size, patch_size, 3) and count % int(1/save_perc) == 0:
                 patch_name = f"{img_name}_{i}_{j}.jpg"
                 patch_path = os.path.join(data_dir, patch_name)
-                # cv2.imwrite(patch_path, patch)
-                count += 1
-    print(f"Processed {count} patches for {img_name}")
+                cv2.imwrite(patch_path, patch)
+            count += 1
 
-def build_fmow_dataset(fmow_path, data_dir, patch_size = PATCH_SIZE):
+def build_fmow_dataset(fmow_path, data_dir, patch_size = PATCH_SIZE, save_perc = 0.1):
     """
     Cut 512x512 and copy image patches from fmow dataset to data_dir
     """
@@ -53,7 +53,7 @@ def build_fmow_dataset(fmow_path, data_dir, patch_size = PATCH_SIZE):
                 if re.search(r"\.jpg$", img_path, re.IGNORECASE):
                     img = cv2.imread(img_path)
                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                    cut_patches(img, data_dir, img_name, patch_size)    
+                    cut_patches(img, data_dir, img_name, patch_size, save_perc)    
 
 def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
@@ -105,7 +105,7 @@ def build_transform(is_train, args):
 def main():
     fmow_path = '/Users/HP/Documents/GitHub/bldng-dmg-assess/data/fmow_test'
     data_dir = '/Users/HP/Documents/GitHub/bldng-dmg-assess/data/fmow_data'
-    build_fmow_dataset(fmow_path, data_dir, 512)
+    build_fmow_dataset(fmow_path, data_dir, 512, )
 
 if __name__ == "__main__":
     main()
