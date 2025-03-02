@@ -23,13 +23,16 @@ PATCH_SIZE = os.getenv('PATCH_SIZE')
 
 def cut_patches(img, data_dir, img_name, patch_size):
     h, w, _ = img.shape
+    count = 0
     for i in tqdm(range(0, h, patch_size)):
         for j in tqdm(range(0, w, patch_size), leave = False):
             patch = img[i:i+patch_size, j:j+patch_size]
             if patch.shape == (patch_size, patch_size, 3):
                 patch_name = f"{img_name}_{i}_{j}.jpg"
                 patch_path = os.path.join(data_dir, patch_name)
-                cv2.imwrite(patch_path, patch)
+                # cv2.imwrite(patch_path, patch)
+                count += 1
+    print(f"Processed {count} patches for {img_name}")
 
 def build_fmow_dataset(fmow_path, data_dir, patch_size = PATCH_SIZE):
     """
