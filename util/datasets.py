@@ -18,6 +18,8 @@ from torchvision import datasets, transforms
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 
+import argparse
+
 FMOW_PATH = os.getenv('FMOW_PATH')
 PATCH_SIZE = os.getenv('PATCH_SIZE')
 
@@ -103,9 +105,13 @@ def build_transform(is_train, args):
     return transforms.Compose(t)
 
 def main():
-    fmow_path = '/Users/HP/Documents/GitHub/bldng-dmg-assess/data/fmow_test'
-    data_dir = '/Users/HP/Documents/GitHub/bldng-dmg-assess/data/fmow_data'
-    build_fmow_dataset(fmow_path, data_dir, 512, )
-
+    parser = argparse.ArgumentParser(description="Cut patches from FMoW dataset images.")
+    parser.add_argument('--fmow_path', type=str, required=True, help='Path to the FMoW dataset.')
+    parser.add_argument('--data_dir', type=str, required=True, help='Directory to save the patches.')
+    parser.add_argument('--patch_size', type=int, default=512, help='Size of the patches.')
+    parser.add_argument('--save_percentage', type=float, default=0.1, help='Percentage of patches to save.')
+    args = parser.parse_args()
+    build_fmow_dataset(args.fmow_path, args.data_dir, args.patch_size, args.save_percentage)
+    
 if __name__ == "__main__":
     main()
