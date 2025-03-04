@@ -40,11 +40,11 @@ def build_fmow_dataset(fmow_path, data_dir, patch_size = PATCH_SIZE, save_perc =
     """
     # airport, crop_field, etc...
     categories = os.listdir(fmow_path)
-    for cat in categories:
+    for cat in tqdm(categories):
         cat_path = os.path.join(fmow_path, cat)
         cat_folders = os.listdir(cat_path)
         # airport_0, airport_1 ...
-        for cat_folder in cat_folders:
+        for cat_folder in tqdm(cat_folders):
             cat_folder_path = os.path.join(cat_path, cat_folder)
             cat_folder_data = os.listdir(cat_folder_path)
             # airport_0_0.jpg, airport_0_1.jpg ...
