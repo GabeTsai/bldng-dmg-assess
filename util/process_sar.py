@@ -5,12 +5,14 @@ from rasterio.warp import transform_bounds, reproject, calculate_default_transfo
 from rasterio.windows import Window
 from skimage import exposure
 import numpy as np
+from PIL import Image
 from dotenv import load_dotenv
 from config.constants import *
 import os
 import gc 
 import psutil
 import logging
+import argparse
 
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(env_path)
@@ -165,8 +167,25 @@ def process_sar():
                 gc.collect()
                 logging.info(f"Final memory: {get_memory_mb():.0f}MB")
  
+def convert_sar(sar_dir, dir_to_save):
+    for img_name in os.listdir(sar_dir):
+        img_path = f'{dir}/{img_name}'
+        tif_image = Image.open(img_path)
+
+        # Norm to RGB
+        np_img = np.array(tif_image)
+        np_img = (np_img - np_img.min()) / (np_img.max() - np_img.min()) * 255
+        np_img = np_img.astype(np.uint8)  # Convert to 8-bit
+
+        jpeg_image = Image.fromarray(np_img)# Convert and save as JPEG
+        jpeg_image.save(f'{dir_to_save}/{img_name.replace(".tif", ".png")}', 'PNG')
+
 def main():
-    pass
+    parser = argparse.ArgumentParser(description="Convert SAR images to PNG format.")
+    parser.add_argument('--sar_dir', type=str, required=True, help='Directory containing SAR images.')
+    parser.add_argument('--dir_to_save', type=str, required=True, help='Directory to save the converted images.')
+    args = parser.parse_args()
+    convert_sar(args.sar_dir, args.dir_to_save)
 
 if __name__ == '__main__':
     main()
