@@ -20,12 +20,12 @@ from timm.utils import accuracy
 
 import util.misc as misc
 import util.lr_sched as lr_sched
-
+import wandb
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, loss_scaler, max_norm: float = 0,
-                    mixup_fn: Optional[Mixup] = None, log_writer=None,
+                    mixup_fn: Optional[Mixup] = None, log_writer=None, wandb_run=None, 
                     args=None):
     model.train(True)
     metric_logger = misc.MetricLogger(delimiter="  ")
@@ -39,6 +39,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
     if log_writer is not None:
         print('log_dir: {}'.format(log_writer.log_dir))
+    
+    if wandb_run is not None:
+        global_step = epoch * len(data_loader)
+        wandb_run.log({'epoch': epoch}, step=global_step)
 
     for data_iter_step, (samples, targets) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
 
@@ -52,7 +56,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         if mixup_fn is not None:
             samples, targets = mixup_fn(samples, targets)
 
-        with torch.cuda.amp.autocast():
+        with torch.autocast("cuda"):
             outputs = model(samples)
             loss = criterion(outputs, targets)
 
@@ -61,7 +65,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
             sys.exit(1)
-
+        
+        # Gradient accumulation
         loss /= accum_iter
         loss_scaler(loss, optimizer, clip_grad=max_norm,
                     parameters=model.parameters(), create_graph=False,
@@ -81,22 +86,38 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         metric_logger.update(lr=max_lr)
 
         loss_value_reduce = misc.all_reduce_mean(loss_value)
-        if log_writer is not None and (data_iter_step + 1) % accum_iter == 0:
-            """ We use epoch_1000x as the x-axis in tensorboard.
+        if (data_iter_step + 1) % accum_iter == 0:
+            """ 
+            We use epoch_1000x as the x-axis in tensorboard.
             This calibrates different curves when batch size changes.
             """
             epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
-            log_writer.add_scalar('loss', loss_value_reduce, epoch_1000x)
-            log_writer.add_scalar('lr', max_lr, epoch_1000x)
+
+            if log_writer is not None:
+                log_writer.add_scalar('loss', loss_value_reduce, epoch_1000x)
+                log_writer.add_scalar('lr', max_lr, epoch_1000x)
+            
+            if wandb_run is not None:
+                cur_step = global_step + data_iter_step
+                wandb_run.log({
+                    'train/loss': loss_value_reduce,
+                    'train/lr': max_lr,
+                    'epoch': epoch + data_iter_step / len(data_loader),
+                    'epoch_1000x': epoch_1000x
+                }, step=cur_step)
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
+    if wandb_run is not None:
+        final_step = (global_step + len(data_loader)) // accum_iter
+        avg_stats = {f"train/{k}": meter.global_avg for k, meter in metric_logger.meters.items()}
+        avg_stats['epoch'] = epoch
+        wandb_run.log(avg_stats, step=final_step)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
-
 @torch.no_grad()
-def evaluate(data_loader, model, device):
+def evaluate(data_loader, model, device, epoch, wandb_run=None):
     criterion = torch.nn.CrossEntropyLoss()
 
     metric_logger = misc.MetricLogger(delimiter="  ")
@@ -112,7 +133,7 @@ def evaluate(data_loader, model, device):
         target = target.to(device, non_blocking=True)
 
         # compute output
-        with torch.cuda.amp.autocast():
+        with torch.autocast("cuda"):
             output = model(images)
             loss = criterion(output, target)
 
@@ -126,5 +147,10 @@ def evaluate(data_loader, model, device):
     metric_logger.synchronize_between_processes()
     print('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
           .format(top1=metric_logger.acc1, top5=metric_logger.acc5, losses=metric_logger.loss))
-
+    if wandb_run is not None:
+        step = epoch * len(data_loader)
+        wandb.log({'val/loss': metric_logger.loss.global_avg,
+                   'val/acc1': metric_logger.acc1.global_avg,
+                   'val/acc5': metric_logger.acc5.global_avg,
+                   'epoch': epoch}, step = step)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
