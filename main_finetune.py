@@ -229,6 +229,7 @@ def main(args):
     
     model = models_vit.__dict__[args.model](
         num_classes=args.nb_classes,
+        img_size = args.input_size,
         drop_path_rate=args.drop_path,
         global_pool=args.global_pool,
     )
