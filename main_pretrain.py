@@ -24,7 +24,7 @@ import torchvision.datasets as datasets
 
 import timm
 
-assert timm.__version__ == "0.3.2"  # version check
+#assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
 import wandb
 
@@ -80,7 +80,7 @@ def get_args_parser():
                         help='path where to save, empty for no saving')
     parser.add_argument('--log_dir', default='./output_dir',
                         help='path where to tensorboard log')
-    parser.add_argument('project_name',default = 'MAE_bldng_dmg_assess', type=str, 
+    parser.add_argument('--project_name',default = 'MAE_bldng_dmg_assess', type=str, 
                         help='Name of the project')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
