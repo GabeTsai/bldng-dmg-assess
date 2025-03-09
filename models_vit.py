@@ -18,12 +18,15 @@ import timm.models.vision_transformer
 
 
 class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
-    """ Vision Transformer with support for global average pooling
+    """ 
+    Vision Transformer with support for global average pooling. Timm uses 
+    scaled dot product attention by default. 
     """
     def __init__(self, img_size = 512, global_pool=False, **kwargs):
         super(VisionTransformer, self).__init__(**kwargs)
         self.set_input_size(img_size = img_size)
         self.global_pool = global_pool
+       
         if self.global_pool:
             norm_layer = kwargs['norm_layer']
             embed_dim = kwargs['embed_dim']

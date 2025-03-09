@@ -169,7 +169,7 @@ def process_sar():
  
 def convert_sar(sar_dir, dir_to_save):
     for img_name in os.listdir(sar_dir):
-        img_path = f'{dir}/{img_name}'
+        img_path = f'{sar_dir}/{img_name}'
         tif_image = Image.open(img_path)
 
         # Norm to RGB
