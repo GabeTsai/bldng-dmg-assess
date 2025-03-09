@@ -123,13 +123,24 @@ def build_transform(is_train, args):
     return transforms.Compose(t)
 
 def main():
-    parser = argparse.ArgumentParser(description="Cut patches from FMoW dataset images.")
-    parser.add_argument('--fmow_path', type=str, required=True, help='Path to the FMoW dataset.')
-    parser.add_argument('--data_dir', type=str, required=True, help='Directory to save the patches.')
-    parser.add_argument('--patch_size', type=int, default=512, help='Size of the patches.')
-    parser.add_argument('--save_percentage', type=float, default=0.1, help='Percentage of patches to save.')
+    parser = argparse.ArgumentParser(description="Dataset processing script.")
+    subparsers = parser.add_subparsers(dest='command')
+    
+    parser_cut = subparsers.add_parser('cut_patches', help='Cut patches from FMoW dataset images.')
+    parser_cut.add_argument('--fmow_path', type=str, required=True, help='Path to the FMoW dataset.')
+    parser_cut.add_argument('--data_dir', type=str, required=True, help='Directory to save the patches.')
+    parser_cut.add_argument('--patch_size', type=int, default=512, help='Size of the patches.')
+    parser_cut.add_argument('--save_percentage', type=float, default=0.1, help='Percentage of patches to save.')
+
+    parser_mean_std = subparsers.add_parser('mean_std', help='Calculate mean and std of dataset.')
+    parser_mean_std.add_argument('--data_dir', type=str, required=True, help='Directory containing the dataset.')
+
     args = parser.parse_args()
-    build_fmow_dataset(args.fmow_path, args.data_dir, args.patch_size, args.save_percentage)
+    if args.command == 'cut_patches':
+        build_fmow_dataset(args.fmow_path, args.data_dir, args.patch_size, args.save_percentage)
+    elif args.command == 'mean_std':
+        mean, std = calculate_mean_std(args.data_dir)
+        print(f"Mean: {mean}, Std: {std}")
 
 if __name__ == "__main__":
     main()
