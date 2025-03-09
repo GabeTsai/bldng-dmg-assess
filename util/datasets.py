@@ -27,8 +27,8 @@ def cut_patches(img, data_dir, img_name, patch_size, save_perc):
     h, w, _ = img.shape
     count = 0
     num_saved = 0
-    for i in tqdm(range(0, h, patch_size)):
-        for j in tqdm(range(0, w, patch_size), leave = False):
+    for i in range(0, h, patch_size):
+        for j in range(0, w, patch_size):
             patch = img[i:i+patch_size, j:j+patch_size]
             if patch.shape == (patch_size, patch_size, 3) and count % int(1/save_perc) == 0:
                 patch_name = f"{img_name}_{i}_{j}.jpg"

@@ -13,7 +13,8 @@ import gc
 import psutil
 import logging
 import argparse
-
+from tqdm import tqdm
+ 
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(env_path)
 
@@ -168,17 +169,19 @@ def process_sar():
                 logging.info(f"Final memory: {get_memory_mb():.0f}MB")
  
 def convert_sar(sar_dir, dir_to_save):
-    for img_name in os.listdir(sar_dir):
-        img_path = f'{dir}/{img_name}'
-        tif_image = Image.open(img_path)
+    saved_imgs = set(os.listdir(dir_to_save))
+    for img_name in tqdm(os.listdir(sar_dir)):
+        img_path = f'{sar_dir}/{img_name}'
+        if img_name.replace(".tif", ".png") not in saved_imgs:
+            tif_image = Image.open(img_path)
+            
+            # Norm to RGB
+            np_img = np.array(tif_image)
+            np_img = (np_img - np_img.min()) / (np_img.max() - np_img.min()) * 255
+            np_img = np_img.astype(np.uint8)  # Convert to 8-bit
 
-        # Norm to RGB
-        np_img = np.array(tif_image)
-        np_img = (np_img - np_img.min()) / (np_img.max() - np_img.min()) * 255
-        np_img = np_img.astype(np.uint8)  # Convert to 8-bit
-
-        jpeg_image = Image.fromarray(np_img)# Convert and save as JPEG
-        jpeg_image.save(f'{dir_to_save}/{img_name.replace(".tif", ".png")}', 'PNG')
+            jpeg_image = Image.fromarray(np_img)# Convert and save as JPEG
+            jpeg_image.save(f'{dir_to_save}/{img_name.replace(".tif", ".png")}', 'PNG')
 
 def main():
     parser = argparse.ArgumentParser(description="Convert SAR images to PNG format.")
