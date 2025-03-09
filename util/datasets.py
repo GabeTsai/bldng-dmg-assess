@@ -20,6 +20,7 @@ from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 
 import argparse
+import numpy as np
 
 FMOW_PATH = os.getenv('FMOW_PATH')
 PATCH_SIZE = os.getenv('PATCH_SIZE')
@@ -58,11 +59,21 @@ def build_fmow_dataset(fmow_path, data_dir, patch_size = PATCH_SIZE, save_perc =
                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                     cut_patches(img, data_dir, img_name, patch_size, save_perc)    
 
-def build_sar_dataset(sar_path, data_dir):
+def calculate_mean_std(data_dir):
     """
-    
+    Get mean and std of RGB channels in dataset
     """
-    pass
+    imgs = os.listdir(data_dir)
+    mean = np.zeros(3)
+    std = np.zeros(3)
+    num_imgs = len(imgs)
+    for img in imgs:
+        path = os.path.join(data_dir, img)
+        img = cv2.imread(path) # H, W, C
+        img_norm = img/ 255.0
+        mean += np.mean(img_norm, axis=(0, 1))
+        std += np.std(img_norm, axis = (0, 1))
+    return mean / num_imgs, std / num_imgs
 
 def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
