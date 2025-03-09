@@ -3,3 +3,6 @@ MAX_RATIO = 0.7 # Maximum ratio of occurence of one color for patch to be consid
 BUILDINGS_THRESHOLD = 100 # GHSL scores settlement between 0 and 100000. We consider a pixel to be a building if it has a score greater than 100
 MIN_BUILDING_COVG = 0.30
 PATCH_SIZE = 512
+
+FMOW_MEAN = [0.42601296, 0.42821994, 0.40039617]
+FMOW_STD = [0.26452429, 0.2589558, 0.26610789]
