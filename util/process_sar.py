@@ -169,6 +169,7 @@ def process_sar():
                 logging.info(f"Final memory: {get_memory_mb():.0f}MB")
  
 def convert_sar(sar_dir, dir_to_save):
+<<<<<<< HEAD
     saved_imgs = set(os.listdir(dir_to_save))
     for img_name in tqdm(os.listdir(sar_dir)):
         img_path = f'{sar_dir}/{img_name}'

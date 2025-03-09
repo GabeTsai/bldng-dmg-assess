@@ -10,6 +10,7 @@
 
 import os
 import PIL
+from PIL import Image
 import re
 import cv2
 from tqdm import tqdm
@@ -56,6 +57,12 @@ def build_fmow_dataset(fmow_path, data_dir, patch_size = PATCH_SIZE, save_perc =
                     img = cv2.imread(img_path)
                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                     cut_patches(img, data_dir, img_name, patch_size, save_perc)    
+
+def build_sar_dataset(sar_path, data_dir):
+    """
+    
+    """
+    pass
 
 def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
@@ -112,6 +119,6 @@ def main():
     parser.add_argument('--save_percentage', type=float, default=0.1, help='Percentage of patches to save.')
     args = parser.parse_args()
     build_fmow_dataset(args.fmow_path, args.data_dir, args.patch_size, args.save_percentage)
-    
+
 if __name__ == "__main__":
     main()
