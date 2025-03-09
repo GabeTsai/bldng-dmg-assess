@@ -97,7 +97,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 log_writer.add_scalar('loss', loss_value_reduce, epoch_1000x)
                 log_writer.add_scalar('lr', max_lr, epoch_1000x)
             
-            if wandb_run is not None:
+            if wandb_run is not None and misc.is_main_process():
                 cur_step = global_step + data_iter_step
                 wandb_run.log({
                     'train/loss': loss_value_reduce,
@@ -150,7 +150,5 @@ def evaluate(data_loader, model, device, epoch, wandb_run=None):
     if wandb_run is not None:
         step = epoch * len(data_loader)
         wandb.log({'val/loss': metric_logger.loss.global_avg,
-                   'val/acc1': metric_logger.acc1.global_avg,
-                   'val/acc5': metric_logger.acc5.global_avg,
                    'epoch': epoch}, step = step)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
