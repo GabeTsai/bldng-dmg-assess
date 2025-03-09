@@ -21,6 +21,7 @@ from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 
 import argparse
 import numpy as np
+import random
 
 FMOW_PATH = os.getenv('FMOW_PATH')
 PATCH_SIZE = os.getenv('PATCH_SIZE')
@@ -63,17 +64,29 @@ def calculate_mean_std(data_dir):
     """
     Get mean and std of RGB channels in dataset
     """
-    imgs = os.listdir(data_dir)
-    mean = np.zeros(3)
-    std = np.zeros(3)
+    imgs = random.sample(os.listdir(data_dir), 50000)
+
+    sums = np.zeros(3)
+    sq_sum = np.zeros(3)
     num_imgs = len(imgs)
-    for img in imgs:
+    num_pixels = num_imgs * 512 * 512
+    for img in tqdm(imgs):
         path = os.path.join(data_dir, img)
         img = cv2.imread(path) # H, W, C
         img_norm = img/ 255.0
-        mean += np.mean(img_norm, axis=(0, 1))
-        std += np.std(img_norm, axis = (0, 1))
-    return mean / num_imgs, std / num_imgs
+        sums += np.sum(img_norm, axis=(0, 1))
+
+    mean = sums / num_pixels
+
+    for img_name in tqdm(imgs, desc="Computing std"):
+        path = os.path.join(data_dir, img_name)
+        img = cv2.imread(path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = img.astype(np.float32) / 255.0
+
+        sq_sum += ((img - mean) ** 2).sum(axis=(0, 1))
+
+    return mean, np.sqrt(sq_sum / (num_pixels - 1))
 
 def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
