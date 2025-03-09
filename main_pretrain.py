@@ -34,7 +34,7 @@ from util.misc import NativeScalerWithGradNormCount as NativeScaler
 import models_mae
 
 from engine_pretrain import train_one_epoch
-
+from config.constants import FMOW_MEAN, FMOW_STD
 
 def get_args_parser():
     parser = argparse.ArgumentParser('MAE pre-training', add_help=False)
@@ -75,6 +75,8 @@ def get_args_parser():
     # Dataset parameters
     parser.add_argument('--data_path', default='/datasets01/imagenet_full_size/061417/', type=str,
                         help='dataset path')
+    parser.add_argument('--dataset_name', default = 'fmow', type = str, 
+                        help = 'Name of the dataset')
 
     parser.add_argument('--output_dir', default='./output_dir',
                         help='path where to save, empty for no saving')
@@ -123,11 +125,17 @@ def main(args):
     cudnn.benchmark = True
 
     # simple augmentation
+    if args.dataset_name == 'fmow':
+        means = FMOW_MEAN
+        stds = FMOW_STD
+    else:
+        means = [0.485, 0.456, 0.406]
+        stds = [0.229, 0.224, 0.225]
     transform_train = transforms.Compose([
             transforms.RandomResizedCrop(args.input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+            transforms.Normalize(mean=means, std=stds)])
     dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_train)
     print(dataset_train)
 
