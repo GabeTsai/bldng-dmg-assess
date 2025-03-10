@@ -149,12 +149,13 @@ def main(args):
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
-    if global_rank == 0 and args.log_dir is not None:
-        os.makedirs(args.log_dir, exist_ok=True)
-        log_writer = SummaryWriter(log_dir=args.log_dir)
-    else:
-        log_writer = None
-        wandb_run = wandb.init(project=args.project_name)
+    if global_rank == 0:
+        if args.log_dir is not None:
+            os.makedirs(args.log_dir, exist_ok=True)
+            log_writer = SummaryWriter(log_dir=args.log_dir)
+        else:
+            log_writer = None
+            wandb_run = wandb.init(project=args.project_name)
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train, sampler=sampler_train,
@@ -204,6 +205,7 @@ def main(args):
             model, data_loader_train,
             optimizer, device, epoch, loss_scaler,
             log_writer=log_writer,
+            wandb_run=wandb_run,
             args=args
         )
         if args.output_dir and (epoch % 20 == 0 or epoch + 1 == args.epochs):
