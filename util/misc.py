@@ -224,6 +224,7 @@ def init_distributed_mode(args):
         os.environ['WORLD_SIZE'] = str(args.world_size)
         # ["RANK", "WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT", "LOCAL_RANK"]
     elif 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+        print("bruh")
         args.rank = int(os.environ["RANK"])
         args.world_size = int(os.environ['WORLD_SIZE'])
         args.gpu = int(os.environ['LOCAL_RANK'])
@@ -315,11 +316,13 @@ def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler):
 def load_model(args, model_without_ddp, optimizer, loss_scaler):
     if args.resume:
         if args.resume.startswith('https'):
-            checkpoint = torch.hub.load_state_dict_from_url(
-                args.resume, map_location='cpu', check_hash=True)
+            checkpoint = torch.hub.load_state_dict_from_url(args.resume, map_location='cpu', check_hash=True)
         else:
             checkpoint = torch.load(args.resume, map_location='cpu')
-        model_without_ddp.load_state_dict(checkpoint['model'])
+        if args.pretrain:
+            model_without_ddp.load_state_dict(checkpoint['model'], strict = False)
+        else:
+            model_without_ddp.load_state_dict(checkpoint['model'])
         print("Resume checkpoint %s" % args.resume)
         if 'optimizer' in checkpoint and 'epoch' in checkpoint and not (hasattr(args, 'eval') and args.eval):
             optimizer.load_state_dict(checkpoint['optimizer'])
