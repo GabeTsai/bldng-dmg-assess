@@ -17,9 +17,11 @@ from collections import defaultdict, deque
 from pathlib import Path
 
 import torch
+import torch.nn as nn
 import torch.distributed as dist
 from torch import inf
 
+import math
 
 class SmoothedValue(object):
     """Track a series of values and provide access to smoothed values over a
@@ -312,6 +314,39 @@ def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler):
         client_state = {'epoch': epoch}
         model.save_checkpoint(save_dir=args.output_dir, tag="checkpoint-%s" % epoch_name, client_state=client_state)
 
+def interpolate_pos_emb(state_dict, model):
+    """
+    Interpolate position embeddings when loading state_dict from a model with different input size
+    """
+    old_emb = state_dict['model']['pos_embed']  # (1, old num patches, emb_dim)
+    emb_dim = old_emb.shape[-1]
+    
+    old_n_patch = old_emb.shape[1] - 1
+    class_pos_embed = old_emb[:, 0]
+    patch_pos_embed = old_emb[:, 1:]
+    n_patch = model.pos_embed.shape[1] - 1
+    patch_size = model.patch_embed.patch_size
+
+    if n_patch == old_n_patch:
+        return state_dict
+
+    # Get image size in terms of patches, + 0.1 to avoid floating point error in interpolation
+    s = int(math.sqrt(n_patch))
+    w0, h0 = s + 0.1, s + 0.1  
+    # Taken from FB research dino
+    
+    patch_pos_embed = nn.functional.interpolate(
+        patch_pos_embed.reshape(1, s, s, emb_dim).permute(0, 3, 1, 2), 
+        scale_factor = (w0 / s, h0 / s), 
+        mode = 'bicubic'
+    )   # (1, emb_dim, width in patches, height in patches)
+
+    assert int(w0) == patch_pos_embed.shape[-2] and int(h0) == patch_pos_embed.shape[-1]
+    patch_pos_embed = patch_pos_embed.permute(0, 2, 3, 1).view(1, -1, emb_dim) # (1, w_p, h_p, emb_dim) -> (1, n_patches, emb_dim)
+    pos_embed = torch.cat((class_pos_embed.unsqueeze(0), patch_pos_embed), dim = 1)
+    state_dict['model']['pos_embed'] = pos_embed
+    return state_dict
+
 
 def load_model(args, model_without_ddp, optimizer, loss_scaler):
     if args.resume:
@@ -320,6 +355,7 @@ def load_model(args, model_without_ddp, optimizer, loss_scaler):
         else:
             checkpoint = torch.load(args.resume, map_location='cpu')
         if args.pretrain:
+            checkpoint['model'] = interpolate_pos_emb(checkpoint, model_without_ddp)
             model_without_ddp.load_state_dict(checkpoint['model'], strict = False)
         else:
             model_without_ddp.load_state_dict(checkpoint['model'])
