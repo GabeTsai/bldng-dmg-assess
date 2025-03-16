@@ -226,7 +226,6 @@ def init_distributed_mode(args):
         os.environ['WORLD_SIZE'] = str(args.world_size)
         # ["RANK", "WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT", "LOCAL_RANK"]
     elif 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
-        print("bruh")
         args.rank = int(os.environ["RANK"])
         args.world_size = int(os.environ['WORLD_SIZE'])
         args.gpu = int(os.environ['LOCAL_RANK'])
@@ -331,13 +330,14 @@ def interpolate_pos_emb(state_dict, model):
         return state_dict
 
     # Get image size in terms of patches, + 0.1 to avoid floating point error in interpolation
+    old_s = math.sqrt(old_n_patch)
     s = int(math.sqrt(n_patch))
     w0, h0 = s + 0.1, s + 0.1  
-    # Taken from FB research dino
     
+    # Taken from FB research dino
     patch_pos_embed = nn.functional.interpolate(
-        patch_pos_embed.reshape(1, s, s, emb_dim).permute(0, 3, 1, 2), 
-        scale_factor = (w0 / s, h0 / s), 
+        patch_pos_embed.reshape(1, int(old_s), int(old_s), emb_dim).permute(0, 3, 1, 2), 
+        scale_factor = (w0 / old_s, h0 / old_s), 
         mode = 'bicubic'
     )   # (1, emb_dim, width in patches, height in patches)
 
@@ -353,7 +353,7 @@ def load_model(args, model_without_ddp, optimizer, loss_scaler):
         if args.resume.startswith('https'):
             checkpoint = torch.hub.load_state_dict_from_url(args.resume, map_location='cpu', check_hash=True)
         else:
-            checkpoint = torch.load(args.resume, map_location='cpu')
+            checkpoint = torch.load(args.resume, map_location='cpu', weights_only = False)
         if args.pretrain:
             checkpoint['model'] = interpolate_pos_emb(checkpoint, model_without_ddp)
             model_without_ddp.load_state_dict(checkpoint['model'], strict = False)
