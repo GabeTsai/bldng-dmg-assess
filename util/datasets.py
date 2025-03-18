@@ -47,6 +47,9 @@ def build_fmow_dataset(fmow_path, data_dir, patch_size = PATCH_SIZE, save_perc =
     categories = os.listdir(fmow_path)
     for cat in tqdm(categories):
         cat_path = os.path.join(fmow_path, cat)
+        cat_dir = os.path.join(data_dir, cat)
+        if not os.path.exists(cat_dir):
+            os.makedirs(cat_dir)
         cat_folders = os.listdir(cat_path)
         # airport_0, airport_1 ...
         for cat_folder in tqdm(cat_folders):
@@ -58,7 +61,7 @@ def build_fmow_dataset(fmow_path, data_dir, patch_size = PATCH_SIZE, save_perc =
                 if re.search(r"\.jpg$", img_path, re.IGNORECASE):
                     img = cv2.imread(img_path)
                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                    cut_patches(img, data_dir, img_name, patch_size, save_perc)    
+                    cut_patches(img, cat_dir, img_name, patch_size, save_perc)    
 
 def calculate_mean_std(data_dir):
     """
