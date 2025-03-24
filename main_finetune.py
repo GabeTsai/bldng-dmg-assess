@@ -126,7 +126,7 @@ def get_args_parser():
                         help='path where to save, empty for no saving')
     parser.add_argument('--log_dir', default='./output_dir',
                         help='path where to tensorboard log')
-    parser.add_argument('project_name',default = 'MAE_bldng_dmg_assess', type=str, 
+    parser.add_argument('project_name',default = 'MAE_bldng_dmg_assess_finetune', type=str, 
                         help='Name of the project')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
@@ -242,6 +242,10 @@ def main(args):
             k: v for k, v in state_dict.items()
             if not k.startswith("decoder_") and not k.startswith("mask_token")
         } 
+
+        # if global pool remove cls token
+        if args.global_pool: 
+            del checkpoint['cls_token']
 
         print("Load pre-trained checkpoint from: %s" % args.finetune)
         checkpoint_model = checkpoint['model']
