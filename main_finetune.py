@@ -236,6 +236,12 @@ def main(args):
 
     if args.finetune and not args.eval:
         checkpoint = torch.load(args.finetune, map_location='cpu')
+        
+        # Remove decoder-related parameters
+        checkpoint = {
+            k: v for k, v in state_dict.items()
+            if not k.startswith("decoder_") and not k.startswith("mask_token")
+        } 
 
         print("Load pre-trained checkpoint from: %s" % args.finetune)
         checkpoint_model = checkpoint['model']
