@@ -24,7 +24,6 @@ import wandb
 
 import timm
 
-assert timm.__version__ == "0.3.2" # version check
 from timm.models.layers import trunc_normal_
 from timm.data.mixup import Mixup
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
@@ -126,7 +125,7 @@ def get_args_parser():
                         help='path where to save, empty for no saving')
     parser.add_argument('--log_dir', default='./output_dir',
                         help='path where to tensorboard log')
-    parser.add_argument('project_name',default = 'MAE_bldng_dmg_assess_finetune', type=str, 
+    parser.add_argument('--project_name',default = 'MAE_bldng_dmg_assess_finetune', type=str, 
                         help='Name of the project')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
