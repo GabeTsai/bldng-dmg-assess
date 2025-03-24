@@ -124,7 +124,7 @@ def get_args_parser():
 
     parser.add_argument('--output_dir', default='./output_dir',
                         help='path where to save, empty for no saving')
-    parser.add_argument('--log_dir', default='./output_dir',
+    parser.add_argument('--log_dir', default=None,
                         help='path where to tensorboard log')
     parser.add_argument('project_name',default = 'MAE_bldng_dmg_assess_finetune', type=str, 
                         help='Name of the project')
@@ -195,12 +195,13 @@ def main(args):
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
 
-    if global_rank == 0 and args.log_dir is not None and not args.eval:
-        os.makedirs(args.log_dir, exist_ok=True)
-        log_writer = SummaryWriter(log_dir=args.log_dir)
-    else:
-        log_writer = None
-        wandb_run = wandb.init(args.project_name)
+    if global_rank == 0 and not args.eval:
+        if args.log_dir is not None:
+            os.makedirs(args.log_dir, exist_ok=True)
+            log_writer = SummaryWriter(log_dir=args.log_dir)
+        else:
+            log_writer = None
+            wandb_run = wandb.init(args.project_name)
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train, sampler=sampler_train,
