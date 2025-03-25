@@ -150,5 +150,6 @@ def evaluate(data_loader, model, device, epoch, wandb_run=None):
     if wandb_run is not None:
         step = epoch * len(data_loader)
         wandb.log({'val/loss': metric_logger.loss.global_avg,
-                   'epoch': epoch}, step = step)
+                   'epoch': epoch, 'val/acc1': metric_logger.acc1.global_avg,
+                     'val/acc5': metric_logger.acc5.global_avg}, step=step)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
