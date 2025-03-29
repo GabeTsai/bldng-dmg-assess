@@ -31,7 +31,7 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
             norm_layer = kwargs['norm_layer']
             embed_dim = kwargs['embed_dim']
             self.fc_norm = norm_layer(embed_dim)
-
+            
             del self.norm  # remove the original norm
 
     def forward_features(self, x):
@@ -45,10 +45,9 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
 
         for blk in self.blocks:
             x = blk(x)
-
         if self.global_pool:
-            x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
-            outcome = self.fc_norm(x)
+            #x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
+            outcome = self.fc_norm(x[:, 1:, :])
         else:
             x = self.norm(x)
             outcome = x[:, 0]

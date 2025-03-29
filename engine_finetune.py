@@ -70,7 +70,11 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         loss /= accum_iter
         loss_scaler(loss, optimizer, clip_grad=max_norm,
                     parameters=model.parameters(), create_graph=False,
-                    update_grad=(data_iter_step + 1) % accum_iter == 0)
+                    update_grad=(data_iter_step + 1) % accum_iter == 0) 
+        if args.log_grad and misc.is_main_process():
+            l2_norm = misc.global_l2_norm_grad(model.parameters())
+            wandb_run.log({'train/l2_norm_grad': l2_norm}, 
+                            step=global_step + data_iter_step)
         if (data_iter_step + 1) % accum_iter == 0:
             optimizer.zero_grad()
 
@@ -109,15 +113,16 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
-    if wandb_run is not None:
-        final_step = (global_step + len(data_loader)) // accum_iter
+    final_step = None
+    if wandb_run is not None and misc.is_main_process():
+        final_step = data_iter_step + global_step
         avg_stats = {f"train/{k}": meter.global_avg for k, meter in metric_logger.meters.items()}
         avg_stats['epoch'] = epoch
         wandb_run.log(avg_stats, step=final_step)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}, final_step
 
 @torch.no_grad()
-def evaluate(data_loader, model, device, epoch, wandb_run=None):
+def evaluate(data_loader, model, device, epoch, wandb_run=None, step=None):
     criterion = torch.nn.CrossEntropyLoss()
 
     metric_logger = misc.MetricLogger(delimiter="  ")
@@ -147,9 +152,10 @@ def evaluate(data_loader, model, device, epoch, wandb_run=None):
     metric_logger.synchronize_between_processes()
     print('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
           .format(top1=metric_logger.acc1, top5=metric_logger.acc5, losses=metric_logger.loss))
-    if wandb_run is not None:
+    avg_stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    if wandb_run is not None and step is not None:
+        print("AGAGAGAGAGGAG")
         step = epoch * len(data_loader)
-        wandb.log({'val/loss': metric_logger.loss.global_avg,
-                   'epoch': epoch, 'val/acc1': metric_logger.acc1.global_avg,
-                     'val/acc5': metric_logger.acc5.global_avg}, step=step)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+        wandb_run.log({f"val/{k}": meter.global_avg for k, meter in metric_logger.meters.items()}|
+                      {"val/epoch": epoch}, step = epoch)
+    return avg_stats

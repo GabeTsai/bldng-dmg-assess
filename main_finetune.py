@@ -33,6 +33,7 @@ import util.misc as misc
 from util.datasets import build_dataset
 from util.pos_embed import interpolate_pos_embed
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
+from torch.distributed.elastic.multiprocessing.errors import record
 
 import models_vit
 
@@ -74,7 +75,8 @@ def get_args_parser():
 
     parser.add_argument('--warmup_epochs', type=int, default=5, metavar='N',
                         help='epochs to warmup LR')
-
+    parser.add_argument('--log_grad', action='store_true', 
+                        help='log l2 norm of full gradient during training')
     # Augmentation parameters
     parser.add_argument('--color_jitter', type=float, default=None, metavar='PCT',
                         help='Color jitter factor (enabled only when not using Auto/RandAug)')
@@ -110,8 +112,7 @@ def get_args_parser():
     # * Finetuning params
     parser.add_argument('--finetune', default='',
                         help='finetune from checkpoint')
-    parser.add_argument('--global_pool', action='store_true')
-    parser.set_defaults(global_pool=True)
+    parser.add_argument('--global_pool', type=str, default = 'avg')
     parser.add_argument('--cls_token', action='store_false', dest='global_pool',
                         help='Use class token instead of global pool for classification')
 
@@ -155,7 +156,7 @@ def get_args_parser():
 
     return parser
 
-
+@record
 def main(args):
     misc.init_distributed_mode(args)
 
@@ -193,19 +194,23 @@ def main(args):
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
-
-    if global_rank == 0 and not args.eval:
+    
+    wandb_run = None
+    log_writer = None
+    if global_rank == 0:
         if args.log_dir is not None:
             os.makedirs(args.log_dir, exist_ok=True)
             log_writer = SummaryWriter(log_dir=args.log_dir)
         else:
             log_writer = None
-            wandb_run = wandb.init(args.project_name)
+            wandb_run = wandb.init(project = args.project_name)
+            wandb.define_metric("val/epoch")
+            wandb.define_metric("val/*", step_metric="val/step")     
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train, sampler=sampler_train,
         batch_size=args.batch_size,
-        num_workers=args.num_workers,
+        num_workers=args.num_workers // args.world_size,
         pin_memory=args.pin_mem,
         drop_last=True,
     )
@@ -213,7 +218,7 @@ def main(args):
     data_loader_val = torch.utils.data.DataLoader(
         dataset_val, sampler=sampler_val,
         batch_size=args.batch_size,
-        num_workers=args.num_workers,
+        num_workers=args.num_workers // args.world_size,
         pin_memory=args.pin_mem,
         drop_last=False
     )
@@ -235,21 +240,18 @@ def main(args):
     )
 
     if args.finetune and not args.eval:
-        checkpoint = torch.load(args.finetune, map_location='cpu')
+        checkpoint = torch.load(args.finetune, map_location='cpu', weights_only = False) 
         
-        # Remove decoder-related parameters
-        checkpoint = {
-            k: v for k, v in state_dict.items()
-            if not k.startswith("decoder_") and not k.startswith("mask_token")
-        } 
-
-        # if global pool remove cls token
-        if args.global_pool: 
-            del checkpoint['cls_token']
-
         print("Load pre-trained checkpoint from: %s" % args.finetune)
         checkpoint_model = checkpoint['model']
         state_dict = model.state_dict()
+
+        # Remove decoder-related parameters
+        checkpoint_model = {
+            k: v for k, v in checkpoint_model.items()
+            if not k.startswith("decoder_") and not k.startswith("mask_token")
+        } 
+        
         for k in ['head.weight', 'head.bias']:
             if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
                 print(f"Removing key {k} from pretrained checkpoint")
@@ -261,11 +263,11 @@ def main(args):
         # load pre-trained model
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
-
-        if args.global_pool:
-            assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
-        else:
-            assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
+        if len(msg.missing_keys):
+            if args.global_pool:
+                assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
+            else:
+                assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
 
         # manually initialize fc layer
         trunc_normal_(model.head.weight, std=2e-5)
@@ -321,10 +323,11 @@ def main(args):
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
     max_accuracy = 0.0
+    
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
-        train_stats = train_one_epoch(
+        train_stats, step = train_one_epoch(
             model, criterion, data_loader_train,
             optimizer, device, epoch, loss_scaler,
             args.clip_grad, mixup_fn,
@@ -337,7 +340,7 @@ def main(args):
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
 
-        test_stats = evaluate(data_loader_val, model, device, epoch = epoch, wandb_run=wandb_run)
+        test_stats = evaluate(data_loader_val, model, device, epoch = epoch, wandb_run=wandb_run, step=step)
         print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
         max_accuracy = max(max_accuracy, test_stats["acc1"])
         print(f'Max accuracy: {max_accuracy:.2f}%')
@@ -351,7 +354,7 @@ def main(args):
                         **{f'test_{k}': v for k, v in test_stats.items()},
                         'epoch': epoch,
                         'n_parameters': n_parameters}
-
+        
         if args.output_dir and misc.is_main_process():
             if log_writer is not None:
                 log_writer.flush()

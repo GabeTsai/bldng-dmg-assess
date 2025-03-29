@@ -377,3 +377,11 @@ def all_reduce_mean(x):
         return x_reduce.item()
     else:
         return x
+
+def global_l2_norm_grad(params):
+    total_grad_norm = 0.0
+    for p in params:
+        if p.grad is not None:
+            param_norm = p.grad.data.norm(2)
+            total_grad_norm += param_norm.item()**2
+    return -1 if math.isinf(total_grad_norm) else total_grad_norm ** 0.5 
