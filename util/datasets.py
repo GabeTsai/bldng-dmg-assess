@@ -22,6 +22,7 @@ from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 import argparse
 import numpy as np
 import random
+import tifffile as tiff
 
 FMOW_PATH = os.getenv('FMOW_PATH')
 PATCH_SIZE = os.getenv('PATCH_SIZE')
@@ -63,29 +64,40 @@ def build_fmow_dataset(fmow_path, data_dir, patch_size = PATCH_SIZE, save_perc =
                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                     cut_patches(img, cat_dir, img_name, patch_size, save_perc)    
 
-def calculate_mean_std(data_dir):
+def calculate_mean_std(data_dir, tif = False):
     """
     Get mean and std of RGB channels in dataset
     """
     imgs = random.sample(os.listdir(data_dir), 50000)
-
-    sums = np.zeros(3)
-    sq_sum = np.zeros(3)
+    if tif:
+        sums = np.zeros(1)
+        sq_sum = np.zeros(1)
+    else:    
+        sums = np.zeros(3)
+        sq_sum = np.zeros(3)
+    print(sums.shape)
     num_imgs = len(imgs)
     num_pixels = num_imgs * 512 * 512
-    for img in tqdm(imgs):
-        path = os.path.join(data_dir, img)
-        img = cv2.imread(path) # H, W, C
-        img_norm = img/ 255.0
-        sums += np.sum(img_norm, axis=(0, 1))
+    img_paths = []
+    for img_name in tqdm(imgs):
+        path = os.path.join(data_dir, img_name)
+        if 'tif' in img_name:
+            img = tiff.imread(path) 
+        else:
+            img = cv2.imread(path) # H, W, C
+            img = img/ 255.0
+        sums += np.sum(img, axis=(0, 1))
+        img_paths.append(path)
 
     mean = sums / num_pixels
-
-    for img_name in tqdm(imgs, desc="Computing std"):
-        path = os.path.join(data_dir, img_name)
-        img = cv2.imread(path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = img.astype(np.float32) / 255.0
+    print(f"Mean: {mean}")
+    for img_path in tqdm(img_paths, desc="Computing std"):
+        if 'tif' in img_name:
+            img = tiff.imread(img_path)
+        else:
+            img = cv2.imread(img_path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = img.astype(np.float32) / 255.0
 
         sq_sum += ((img - mean) ** 2).sum(axis=(0, 1))
 
@@ -150,12 +162,13 @@ def main():
 
     parser_mean_std = subparsers.add_parser('mean_std', help='Calculate mean and std of dataset.')
     parser_mean_std.add_argument('--data_dir', type=str, required=True, help='Directory containing the dataset.')
-
+    parser_mean_std.add_argument('--tif', action = 'store_true', help = 'Processing tif images')
+      
     args = parser.parse_args()
     if args.command == 'cut_patches':
         build_fmow_dataset(args.fmow_path, args.data_dir, args.patch_size, args.save_percentage)
     elif args.command == 'mean_std':
-        mean, std = calculate_mean_std(args.data_dir)
+        mean, std = calculate_mean_std(args.data_dir, args.tif)
         print(f"Mean: {mean}, Std: {std}")
 
 if __name__ == "__main__":

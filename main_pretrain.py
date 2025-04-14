@@ -35,7 +35,7 @@ from util.misc import NativeScalerWithGradNormCount as NativeScaler
 import models_mae
 
 from engine_pretrain import train_one_epoch
-from config.constants import FMOW_MEAN, FMOW_STD
+from config.constants import FMOW_MEAN, FMOW_STD, SAR_MEAN, SAR_STD
 
 def get_args_parser():
     parser = argparse.ArgumentParser('MAE pre-training', add_help=False)
@@ -145,9 +145,13 @@ def main(args):
     if args.dataset_name == 'fmow':
         means = FMOW_MEAN
         stds = FMOW_STD
+    elif args.dataset_name == 'sar':
+        means = SAR_MEAN
+        stds = SAR_STD
     else:
         means = [0.485, 0.456, 0.406]
         stds = [0.229, 0.224, 0.225]
+    print(f"Means: {means}, stds: {stds}")
     transform_train = transforms.Compose([
             transforms.RandomResizedCrop(args.input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
             transforms.RandomHorizontalFlip(),
@@ -226,7 +230,7 @@ def main(args):
             wandb_run=wandb_run,
             args=args
         )
-        if args.output_dir and (epoch % 20 == 0 or epoch + 1 == args.epochs):
+        if args.output_dir and (epoch % 1 == 0 or epoch + 1 == args.epochs):
             misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)

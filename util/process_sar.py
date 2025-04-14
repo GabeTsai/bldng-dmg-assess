@@ -129,33 +129,33 @@ def cut_patches(img, img_name, dir, patch_size = PATCH_SIZE, max_ratio = MAX_RAT
                 patch = np.pad(patch, ((0, patch_size - patch.shape[0]), 
                                        (0, patch_size - patch.shape[1])), mode='constant', constant_values=0)
                 
-            # If patch doesn't have too many of one pixel, add it to the list
+            # If patch doesn't have too many black pixels, and the image has enough contrast (isn't straight up noise), add patch 
             if np.sum(patch == 0) / patch.size < max_ratio:
-                # Save patch to disk
-                patch_path = f'{dir}/{img_name}_patch_{i}_{j}.tif'
-                patch = contrast_stretch(patch)
-                with rasterio.open(patch_path, 'w', driver='GTiff', width=patch_size, height=patch_size, count=1, dtype=np.float32, crs=img.crs, transform=img.window_transform(window)) as dst:
-                    dst.write(patch, 1)
-                
-                patches_processed += 1
-                if patches_processed % 1000 == 0:
-                    gc.collect()
-                    logging.info(f"Processed {patches_processed} patches - Memory: {get_memory_mb():.0f}MB")
-                
-                del patch
+                log_patch = np.log10(patch, out=np.zeros_like(patch, dtype=np.float32), where=(patch!=0))
+                if np.max(log_patch) - np.min(log_patch[log_patch != 0]) > 0.5:
+                    patch_path = f'{dir}/{img_name}_patch_{i}_{j}.tif'
+                    with rasterio.open(patch_path, 'w', driver='GTiff', width=patch_size, height=patch_size, count=1, dtype=np.float32, crs=img.crs, transform=img.window_transform(window)) as dst:
+                        dst.write(log_patch, 1)
+                    
+                    patches_processed += 1
+                    if patches_processed % 1000 == 0:
+                        gc.collect()
+                        logging.info(f"Processed {patches_processed} patches - Memory: {get_memory_mb():.0f}MB")
+                    
+                    del patch
     gc.collect()    
 
 
-def process_sar():
+def process_sar(sar_dir, target_dir):
     years = [2020, 2021, 2022, 2023, 2024, 2025]
     ghsl_path = f'{GHSL_DATA_FOLDER}/{GHSL}'
     
     print('Processing SAR images')
     for year in years:
-        dir_names = os.listdir(f'{SAR_DATA_FOLDER}/{year}')
+        dir_names = os.listdir(f'{sar_dir}/{year}')
         for dir_name in dir_names:
             if 'geo' in dir_name.lower():
-                img_path = f'{SAR_DATA_FOLDER}/{year}/{dir_name}/{dir_name}.tif'
+                img_path = f'{sar_dir}/{year}/{dir_name}/{dir_name}.tif'
                 logging.info(f"\nProcessing {img_path}")
                 logging.info(f"Initial memory: {get_memory_mb():.0f}MB")
                 
@@ -163,13 +163,12 @@ def process_sar():
                 building_ratio = detect_buildings(ghsl_path, sar, threshold = BUILDINGS_THRESHOLD)
                 print(f"Total building coverage for {dir_name}: {building_ratio}")
                 if building_ratio >= MIN_BUILDING_COVG:
-                    cut_patches(sar, dir_name, f'{DATA_FOLDER}/sar_patches')
+                    cut_patches(sar, dir_name, target_dir)
                 sar.close()
                 gc.collect()
                 logging.info(f"Final memory: {get_memory_mb():.0f}MB")
  
 def convert_sar(sar_dir, dir_to_save):
-<<<<<<< HEAD
     saved_imgs = set(os.listdir(dir_to_save))
     for img_name in tqdm(os.listdir(sar_dir)):
         img_path = f'{sar_dir}/{img_name}'
@@ -185,11 +184,25 @@ def convert_sar(sar_dir, dir_to_save):
             jpeg_image.save(f'{dir_to_save}/{img_name.replace(".tif", ".png")}', 'PNG')
 
 def main():
-    parser = argparse.ArgumentParser(description="Convert SAR images to PNG format.")
-    parser.add_argument('--sar_dir', type=str, required=True, help='Directory containing SAR images.')
-    parser.add_argument('--dir_to_save', type=str, required=True, help='Directory to save the converted images.')
+    parser = argparse.ArgumentParser(description="SAR image processing utility.")
+    subparsers = parser.add_subparsers(dest='command', required=True)
+
+    # Subparser for convert_sar
+    convert_parser = subparsers.add_parser('convert', help='Convert SAR TIFF images to PNG format.')
+    convert_parser.add_argument('--sar_dir', type=str, required=True, help='Directory containing SAR images.')
+    convert_parser.add_argument('--dir_to_save', type=str, required=True, help='Directory to save the converted images.')
+
+    # Subparser for process_sar
+    process_parser = subparsers.add_parser('process', help='Process SAR images for building detection.')
+    process_parser.add_argument('--sar_dir', type=str, required=True, help='Directory containing SAR image folders.')
+    process_parser.add_argument('--target_dir', type=str, required=True, help='Directory to save processed patches.')
+
     args = parser.parse_args()
-    convert_sar(args.sar_dir, args.dir_to_save)
+
+    if args.command == 'convert':
+        convert_sar(args.sar_dir, args.dir_to_save)
+    elif args.command == 'process':
+        process_sar(args.sar_dir, args.target_dir)
 
 if __name__ == '__main__':
     main()
