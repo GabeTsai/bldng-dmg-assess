@@ -115,23 +115,29 @@ def rearrange_bright(bright_dir, data_dir):
         os.makedirs(data_dir + '/images')
     if not os.path.exists(data_dir + '/targets'):
         os.makedirs(data_dir + '/targets')
-    pre_dir, post_dir, target_dir = sorted(os.listdir(data_dir))
-    for pre_img, post_img, target_img in zip(
+    
+    pre_dir, post_dir, target_dir = sorted(os.listdir(bright_dir))
+    
+    prev_len = len(os.listdir(os.path.join(bright_dir, pre_dir)))
+
+    for pre_img, post_img, target_img in tqdm(zip(
         sorted(os.listdir(os.path.join(bright_dir, pre_dir))),
         sorted(os.listdir(os.path.join(bright_dir, post_dir))),
         sorted(os.listdir(os.path.join(bright_dir, target_dir)))
-        ):
+        )):
         pre_img_path = os.path.join(bright_dir, pre_dir, pre_img)
         new_pre_img_path = os.path.join(data_dir, 'images', pre_img)
-        os.move(pre_img_path, new_pre_img_path)
+        os.rename(pre_img_path, new_pre_img_path)
         post_img_path = os.path.join(bright_dir, post_dir, post_img)
         new_post_img_path = os.path.join(data_dir, 'images', post_img)
-        os.move(post_img_path, new_post_img_path)\
+        os.rename(post_img_path, new_post_img_path)\
         
-        new_target_img = target_img[:target_img.find('.')] + '.tif'
+        new_target_img = target_img[:target_img.find('_building_damage.tif')] + '_post_disaster_target.tif'
         target_img_path = os.path.join(bright_dir, target_dir, target_img)
         new_target_img_path = os.path.join(data_dir, 'targets', new_target_img)
-        os.move(target_img_path, new_target_img_path)
+        os.rename(target_img_path, new_target_img_path)
+    
+    assert prev_len == 0.5 * len(os.listdir(os.path.join(data_dir, 'images'))) == len(os.listdir(os.path.join(data_dir, 'targets'))) 
 
 def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
