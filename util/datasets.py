@@ -24,6 +24,9 @@ import numpy as np
 import random
 import tifffile as tiff
 
+from huggingface_hub import create_repo, repo_exists
+from datasets import Dataset, DatasetDict, config, Features, Image, Value
+
 FMOW_PATH = os.getenv('FMOW_PATH')
 PATCH_SIZE = os.getenv('PATCH_SIZE')
 
@@ -103,36 +106,6 @@ def calculate_mean_std(data_dir, tif = False):
 
     return mean, np.sqrt(sq_sum / (num_pixels - 1))
 
-def rearrange_bright(bright_dir, data_dir):
-    """
-    Reorganize bright dataset to follow torchange xview2 structure
-
-    Args:
-        bright_dir (str): Directory containing the bright dataset.
-        data_dir (str): Directory to save the rearranged dataset.
-    """
-    if not os.path.exists(data_dir + '/images'):
-        os.makedirs(data_dir + '/images')
-    if not os.path.exists(data_dir + '/targets'):
-        os.makedirs(data_dir + '/targets')
-    pre_dir, post_dir, target_dir = sorted(os.listdir(data_dir))
-    for pre_img, post_img, target_img in zip(
-        sorted(os.listdir(os.path.join(bright_dir, pre_dir))),
-        sorted(os.listdir(os.path.join(bright_dir, post_dir))),
-        sorted(os.listdir(os.path.join(bright_dir, target_dir)))
-        ):
-        pre_img_path = os.path.join(bright_dir, pre_dir, pre_img)
-        new_pre_img_path = os.path.join(data_dir, 'images', pre_img)
-        os.move(pre_img_path, new_pre_img_path)
-        post_img_path = os.path.join(bright_dir, post_dir, post_img)
-        new_post_img_path = os.path.join(data_dir, 'images', post_img)
-        os.move(post_img_path, new_post_img_path)\
-        
-        new_target_img = target_img[:target_img.find('.')] + '.tif'
-        target_img_path = os.path.join(bright_dir, target_dir, target_img)
-        new_target_img_path = os.path.join(data_dir, 'targets', new_target_img)
-        os.move(target_img_path, new_target_img_path)
-
 def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
 
@@ -193,18 +166,12 @@ def main():
     parser_mean_std.add_argument('--data_dir', type=str, required=True, help='Directory containing the dataset.')
     parser_mean_std.add_argument('--tif', action = 'store_true', help = 'Processing tif images')
 
-    parser_rearrange_bright = subparsers.add_parser('rearrange_bright', help='Rearrange bright dataset to follow torchange xview2 structure')
-    parser_rearrange_bright.add_argument('--bright_dir', type=str, required=True, help='Directory containing the bright dataset.')
-    parser_rearrange_bright.add_argument('--data_dir', type=str, required=True, help='Directory to save the rearranged dataset.')
-
-    args = parser.parse_args()
+    args = parser.parse_args() 
     if args.command == 'cut_patches':
         build_fmow_dataset(args.fmow_path, args.data_dir, args.patch_size, args.save_percentage)
     elif args.command == 'mean_std':
         mean, std = calculate_mean_std(args.data_dir, args.tif)
         print(f"Mean: {mean}, Std: {std}")
-    elif args.command == 'rearrange_bright':
-        rearrange_bright(args.bright_dir, args.data_dir)
-
+    
 if __name__ == "__main__":
     main()
