@@ -4,34 +4,56 @@ from datasets import Dataset, DatasetDict, config, Features, Image, Value
 
 import argparse
 
+TRAIN_DIS = set(['bata-explosion', 'la_palma-volcano', 'turkey-earthquake', 'beirut-explosion', 'congo-volcano', 'haiti-earthquake', 'hawaii-wildfire'])
+VAL_DIS = set(['libya-flood', 'morroco-earthquake'])
+
 def rearrange_bright(bright_dir, data_dir):
     """
-    Reorganize bright dataset to follow torchange xview2 structure
+    Reorganize bright dataset into train/val split following torchange xview2 structure.
+    Split is done based on disaster, with most recent disasters in validation dataset to prevent
+    temporal leakage.
 
     Args:
         bright_dir (str): Directory containing the bright dataset.
         data_dir (str): Directory to save the rearranged dataset.
     """
+    
+    if not os.path.exists(os.path.join(data_dir, 'train')):
+        os.makedirs(os.path.join(data_dir, 'train'))
+    if not os.path.exists(os.path.join(data_dir, 'val')):
+        os.makedirs(os.path.join(data_dir, 'val'))
+    
     if not os.path.exists(data_dir + '/images'):
         os.makedirs(data_dir + '/images')
     if not os.path.exists(data_dir + '/targets'):
         os.makedirs(data_dir + '/targets')
+
     pre_dir, post_dir, target_dir = sorted(os.listdir(data_dir))
     for pre_img, post_img, target_img in zip(
         sorted(os.listdir(os.path.join(bright_dir, pre_dir))),
         sorted(os.listdir(os.path.join(bright_dir, post_dir))),
         sorted(os.listdir(os.path.join(bright_dir, target_dir)))
         ):
+        disaster = target_img[:target_img.find('_0')]
+        
+        if disaster in TRAIN_DIS:
+            split_path = os.path.join(data_dir, 'train')
+        elif disaster in VAL_DIS:
+            split_path = os.path.join(data_dir, 'val')
+        else:
+            raise ValueError(f"Unknown disaster {disaster} in {target_img}.")
+        
         pre_img_path = os.path.join(bright_dir, pre_dir, pre_img)
-        new_pre_img_path = os.path.join(data_dir, 'images', pre_img)
+        new_pre_img_path = os.path.join(split_path, 'images', pre_img)
         os.move(pre_img_path, new_pre_img_path)
+        
         post_img_path = os.path.join(bright_dir, post_dir, post_img)
-        new_post_img_path = os.path.join(data_dir, 'images', post_img)
+        new_post_img_path = os.path.join(split_path, 'images', post_img)
         os.move(post_img_path, new_post_img_path)\
         
-        new_target_img = target_img[:target_img.find('.')] + '.tif'
+        new_target_img = target_img[:target_img.find('_building_damage')] + '_target.tif'
         target_img_path = os.path.join(bright_dir, target_dir, target_img)
-        new_target_img_path = os.path.join(data_dir, 'targets', new_target_img)
+        new_target_img_path = os.path.join(split_path, 'targets', new_target_img)
         os.move(target_img_path, new_target_img_path)
 
 def upload_to_hf(data_dir, repo_name = "BRIGHT-XView2Format"):
