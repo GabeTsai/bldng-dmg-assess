@@ -157,8 +157,8 @@ def main(args):
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=means, std=stds)])
+    
     dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_train)
-    print(dataset_train)
 
     if args.distributed:
         num_tasks = misc.get_world_size()
