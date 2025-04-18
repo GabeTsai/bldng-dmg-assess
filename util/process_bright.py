@@ -7,9 +7,22 @@ import argparse
 TRAIN_DIS = set(['bata-explosion', 'la_palma-volcano', 'turkey-earthquake', 'beirut-explosion', 'congo-volcano', 'haiti-earthquake', 'hawaii-wildfire'])
 VAL_DIS = set(['libya-flood', 'morroco-earthquake'])
 
+def create_split_dirs(base_dir, split_name):
+    """
+    Create the necessary directories for a given split (e.g., train or val).
+    
+    Args:
+        base_dir (str): The base directory where the split directories will be created.
+        split_name (str): The name of the split (e.g., 'train' or 'val').
+    """
+    split_dir = os.path.join(base_dir, split_name)
+    os.makedirs(split_dir, exist_ok=True)
+    os.makedirs(os.path.join(split_dir, 'images'), exist_ok=True)
+    os.makedirs(os.path.join(split_dir, 'targets'), exist_ok=True)
+
 def rearrange_bright(bright_dir, data_dir):
     """
-    Reorganize bright dataset into train/val split following torchange xview2 structure.
+    Reorganize bright dataset train folder into train/val split following torchange xview2 structure.
     Split is done based on disaster, with most recent disasters in validation dataset to prevent
     temporal leakage.
 
@@ -18,17 +31,11 @@ def rearrange_bright(bright_dir, data_dir):
         data_dir (str): Directory to save the rearranged dataset.
     """
     
-    if not os.path.exists(os.path.join(data_dir, 'train')):
-        os.makedirs(os.path.join(data_dir, 'train'))
-    if not os.path.exists(os.path.join(data_dir, 'val')):
-        os.makedirs(os.path.join(data_dir, 'val'))
-    
-    if not os.path.exists(data_dir + '/images'):
-        os.makedirs(data_dir + '/images')
-    if not os.path.exists(data_dir + '/targets'):
-        os.makedirs(data_dir + '/targets')
+    create_split_dirs(data_dir, 'train')
+    create_split_dirs(data_dir, 'val')
 
-    pre_dir, post_dir, target_dir = sorted(os.listdir(data_dir))
+    post_dir, pre_dir, target_dir = sorted(os.listdir(bright_dir))
+
     for pre_img, post_img, target_img in zip(
         sorted(os.listdir(os.path.join(bright_dir, pre_dir))),
         sorted(os.listdir(os.path.join(bright_dir, post_dir))),
@@ -46,10 +53,10 @@ def rearrange_bright(bright_dir, data_dir):
         pre_img_path = os.path.join(bright_dir, pre_dir, pre_img)
         new_pre_img_path = os.path.join(split_path, 'images', pre_img)
         os.move(pre_img_path, new_pre_img_path)
-        
+
         post_img_path = os.path.join(bright_dir, post_dir, post_img)
         new_post_img_path = os.path.join(split_path, 'images', post_img)
-        os.move(post_img_path, new_post_img_path)\
+        os.move(post_img_path, new_post_img_path)
         
         new_target_img = target_img[:target_img.find('_building_damage')] + '_target.tif'
         target_img_path = os.path.join(bright_dir, target_dir, target_img)
