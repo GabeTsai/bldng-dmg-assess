@@ -2,6 +2,7 @@ import os
 import shutil
 from huggingface_hub import create_repo, repo_exists
 from datasets import Dataset, DatasetDict, config, Features, Image, Value
+import tifffile as tiff
 
 import argparse
 
@@ -84,12 +85,19 @@ def upload_to_hf(data_dir, repo_name = "BRIGHT-XView2Format"):
             pre_img_path = os.path.join(images_dir, dis_name_code + '_pre_disaster.tif') 
             post_img_path = os.path.join(images_dir, dis_name_code + '_post_disaster.tif')
             target_path = os.path.join(targets_dir, target_name)
-            splits[dataset].append({'pre_disaster_image': pre_img_path, 'post_disaster_image': post_img_path, 'target': target_path})
+
+            pre_img = tiff.imread(pre_img_path)
+            post_img = tiff.imread(post_img_path)
+            target = tiff.imread(target_path)
+
+            splits[dataset].append({'t1_image': pre_img, 't2_image': post_img, 
+                                    'change_mask': target, 'image_name': f"{dataset}/images/{dis_name_code}"})
     
     features = Features({
-        'pre_disaster_image': Image(),
-        'post_disaster_image': Image(), 
-        'target': Image()
+        't1_image': Image(),
+        't2_image': Image(), 
+        'change_mask': Image(), 
+        'image_name' : Value(dtype='string')
     })
 
     dataset_hf = DatasetDict({
