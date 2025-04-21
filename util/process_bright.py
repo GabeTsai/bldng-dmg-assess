@@ -77,6 +77,9 @@ def upload_to_hf(data_dir, repo_name = "BRIGHT-XView2Format"):
         targets_dir = os.path.join(data_dir, dataset, 'targets')
         splits[dataset] = []
         for img_name, target_name in zip(sorted(os.listdir(images_dir)), sorted(os.listdir(targets_dir))):
+            event_name = img_name[:img_name.find('_0')]
+            if event_name not in TRAIN_DIS and event_name not in VAL_DIS:
+                raise ValueError(f"Unknown disaster {event_name} in {img_name}.")
             dis_name_code = ''
             if 'pre' in img_name:      
                 dis_name_code = img_name[:img_name.find('_pre')]
@@ -91,7 +94,8 @@ def upload_to_hf(data_dir, repo_name = "BRIGHT-XView2Format"):
             target = tiff.imread(target_path)
 
             splits[dataset].append({'t1_image': pre_img, 't2_image': post_img, 
-                                    'change_mask': target, 'image_name': f"{dataset}/images/{dis_name_code}"})
+                                    'change_mask': target, 'image_name': f"{dataset}/images/{dis_name_code}", 
+                                    'event_name': event_name})
     
     features = Features({
         't1_image': Image(),
