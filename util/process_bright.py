@@ -101,7 +101,8 @@ def upload_to_hf(data_dir, repo_name = "BRIGHT-XView2Format"):
         't1_image': Image(),
         't2_image': Image(), 
         'change_mask': Image(), 
-        'image_name' : Value(dtype='string')
+        'image_name' : Value(dtype='string'),
+        'event_name': Value(dtype='string')
     })
 
     dataset_hf = DatasetDict({
