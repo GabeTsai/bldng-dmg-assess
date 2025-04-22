@@ -159,12 +159,18 @@ def main():
     parser_upload.add_argument('--data_dir', type=str, required=True, help='Directory containing the dataset.')
     parser_upload.add_argument('--repo_name', type=str, default="BRIGHT-XView2Format", help='Name of the Hugging Face repository.')
 
+    parser_create_finetune = subparsers.add_parser('create_class_finetune', help='Create classes from bright dataset to evaluate model via finetuning.')
+    parser_create_finetune.add_argument('--bright_dir', type=str, required=True, help='Directory containing the bright dataset.')
+    parser_create_finetune.add_argument('--data_dir', type=str, required=True, help='Directory to save the finetune dataset.')
+
     args = parser.parse_args()
     
     if args.command == 'rearrange_bright':
         rearrange_bright(args.bright_dir, args.data_dir)
     elif args.command == 'upload_to_hf':
         upload_to_hf(args.data_dir, args.repo_name)
+    elif args.command == 'create_class_finetune':
+        create_class_finetune(args.bright_dir, args.data_dir)
 
 if __name__ == "__main__":
     main()
