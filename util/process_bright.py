@@ -9,6 +9,8 @@ import argparse
 TRAIN_DIS = set(['bata-explosion', 'la_palma-volcano', 'turkey-earthquake', 'beirut-explosion', 'congo-volcano', 'haiti-earthquake', 'hawaii-wildfire'])
 VAL_DIS = set(['libya-flood', 'morocco-earthquake'])
 
+CLASSES = ('explosion', 'volcano', 'earthquake', 'wildfire', 'flood')
+
 def create_split_dirs(base_dir, split_name):
     """
     Create the necessary directories for a given split (e.g., train or val).
@@ -21,6 +23,38 @@ def create_split_dirs(base_dir, split_name):
     os.makedirs(split_dir, exist_ok=True)
     os.makedirs(os.path.join(split_dir, 'images'), exist_ok=True)
     os.makedirs(os.path.join(split_dir, 'targets'), exist_ok=True)
+
+def create_class_finetune(bright_dir, data_dir):
+    """
+    Create classes from bright dataset to evaluate model via finetuning.
+    Args:
+        bright_dir (str): Directory containing the bright dataset.
+        data_dir (str): Directory to save the rearranged dataset.
+    """
+   
+    # Create the necessary directories in data_dir for the train and val splits
+    for split in ('train', 'val'):
+        split_dir = os.path.join(data_dir, split)
+        if not os.path.exists(split_dir):
+            os.makedirs(split_dir)
+        for event in CLASSES:
+            if not os.path.exists(os.path.join(split_dir, event)):
+                os.makedirs(os.path.join(split_dir, event))
+    
+    for split in ('train', 'val'):
+        if not os.path.exists(os.path.join(data_dir, split)):
+            os.makedirs(os.path.join(data_dir, split)) 
+        bright_split_dir = os.path.join(bright_dir, split)
+        for img_name in os.listdir(os.path.join(bright_split_dir, 'post-event')):
+            
+            event_name = ''
+            for disaster in TRAIN_DIS:
+                if disaster in img_name:
+                    event_name = disaster
+                    break
+            
+            img_path = os.path.join(data_dir, split, event_name, img_name)
+            shutil.move(os.path.join(bright_split_dir, 'post-event', img_name), img_path)
 
 def rearrange_bright(bright_dir, data_dir):
     """
