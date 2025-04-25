@@ -40,7 +40,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     if log_writer is not None:
         print('log_dir: {}'.format(log_writer.log_dir))
     
-    if wandb_run is not None:
+    if wandb_run is not None and misc.is_main_process():
         global_step = epoch * len(data_loader)
         wandb_run.log({'epoch': epoch}, step=global_step)
 
@@ -153,7 +153,7 @@ def evaluate(data_loader, model, device, epoch, wandb_run=None, step=None):
     print('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
           .format(top1=metric_logger.acc1, top5=metric_logger.acc5, losses=metric_logger.loss))
     avg_stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
-    if wandb_run is not None and step is not None:
+    if wandb_run is not None and step is not None and misc.is_main_process():
         print("AGAGAGAGAGGAG")
         wandb_run.log({f"val/{k}": meter.global_avg for k, meter in metric_logger.meters.items()}|
                       {"val/epoch": epoch}, step = step)
