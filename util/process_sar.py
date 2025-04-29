@@ -13,6 +13,8 @@ import gc
 import psutil
 import logging
 import argparse
+import geopandas as gpd
+import matplotlib.pyplot as plt
 from tqdm import tqdm
  
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
@@ -145,11 +147,31 @@ def cut_patches(img, img_name, dir, patch_size = PATCH_SIZE, max_ratio = MAX_RAT
                     del patch
     gc.collect()    
 
+def plot_coverage(boxes):
+    """
+    Plot the coverage of the SAR images on a map.
+    Arguments:
+    - boxes: List of bounding boxes for the SAR images.
+    """
+    fig, ax = plt.subplots(figsize=(10, 10))
+    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+    world.boundary.plot(ax=ax, linewidth=1)
+    
+    for box in boxes:
+        bottom, left, right, top = box
+        rect = plt.Rectangle((left, bottom), right - left, top - bottom, linewidth=1, edgecolor = 'red', alpha = 0.25, facecolor = 'red')
+        ax.add_patch(rect)
+    
+    plt.title('SAR Image Coverage')
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    plt.savefig('sar_coverage.png')
 
-def process_sar(sar_dir, target_dir):
+def process_sar(sar_dir, target_dir, get_coverage):
     years = [2020, 2021, 2022, 2023, 2024, 2025]
     ghsl_path = f'{GHSL_DATA_FOLDER}/{GHSL}'
     
+    boxes = []
     print('Processing SAR images')
     for year in years:
         dir_names = os.listdir(f'{sar_dir}/{year}')
@@ -163,11 +185,18 @@ def process_sar(sar_dir, target_dir):
                 building_ratio = detect_buildings(ghsl_path, sar, threshold = BUILDINGS_THRESHOLD)
                 print(f"Total building coverage for {dir_name}: {building_ratio}")
                 if building_ratio >= MIN_BUILDING_COVG:
-                    cut_patches(sar, dir_name, target_dir)
+                    if get_coverage:
+                        bounds = sar.bounds     # Get bounds of SAR image in WGS84
+                        wgs84_bounds = transform_bounds(sar.crs, 'EPSG:4326',
+                                    bounds.left, bounds.bottom,
+                                    bounds.right, bounds.top)
+                        boxes.append(wgs84_bounds)
+                    else:
+                        cut_patches(sar, dir_name, target_dir)
                 sar.close()
                 gc.collect()
                 logging.info(f"Final memory: {get_memory_mb():.0f}MB")
- 
+
 def convert_sar(sar_dir, dir_to_save):
     saved_imgs = set(os.listdir(dir_to_save))
     for img_name in tqdm(os.listdir(sar_dir)):
@@ -196,13 +225,14 @@ def main():
     process_parser = subparsers.add_parser('process', help='Process SAR images for building detection.')
     process_parser.add_argument('--sar_dir', type=str, required=True, help='Directory containing SAR image folders.')
     process_parser.add_argument('--target_dir', type=str, required=True, help='Directory to save processed patches.')
+    process_parser.add_argument('--get_coverage', action='store_true', help='Flag to get global coverage of chosen SAR images.')
 
     args = parser.parse_args()
 
     if args.command == 'convert':
         convert_sar(args.sar_dir, args.dir_to_save)
     elif args.command == 'process':
-        process_sar(args.sar_dir, args.target_dir)
+        process_sar(args.sar_dir, args.target_dir, args.get_coverage)
 
 if __name__ == '__main__':
     main()
