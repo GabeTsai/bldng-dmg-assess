@@ -16,6 +16,8 @@ import argparse
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import math
+import pickle
  
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(env_path)
@@ -153,14 +155,15 @@ def plot_coverage(boxes):
     Arguments:
     - boxes: List of bounding boxes for the SAR images.
     """
-    fig, ax = plt.subplots(figsize=(10, 10))
-    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+    fig, ax = plt.subplots(figsize=(10, 10), dpi = 500)
+    world = gpd.read_file("https://naciscdn.org/naturalearth/110m/cultural/ne_110m_admin_0_countries.zip")
     world.boundary.plot(ax=ax, linewidth=1)
     
     for box in boxes:
-        bottom, left, right, top = box
-        rect = plt.Rectangle((left, bottom), right - left, top - bottom, linewidth=1, edgecolor = 'red', alpha = 0.25, facecolor = 'red')
-        ax.add_patch(rect)
+        left, bottom, right, top = box
+        center_x = (left + right) / 2
+        center_y = (bottom + top) / 2
+        ax.scatter(center_x, center_y, color = 'red', s = 10, alpha = 0.5)     
     
     plt.title('SAR Image Coverage')
     plt.xlabel('Longitude')
@@ -172,6 +175,11 @@ def process_sar(sar_dir, target_dir, get_coverage):
     ghsl_path = f'{GHSL_DATA_FOLDER}/{GHSL}'
     
     boxes = []
+    used_images = set()
+    if os.path.exists('used_sar_images.pkl'):
+        with open('used_sar_images.pkl', 'rb') as fp:
+            used_images = pickle.load(fp)
+
     print('Processing SAR images')
     for year in years:
         dir_names = os.listdir(f'{sar_dir}/{year}')
@@ -182,6 +190,15 @@ def process_sar(sar_dir, target_dir, get_coverage):
                 logging.info(f"Initial memory: {get_memory_mb():.0f}MB")
                 
                 sar = rasterio.open(img_path)
+                if dir_name in used_images: 
+                    bounds = sar.bounds     # Get bounds of SAR image in WGS84
+                    wgs84_bounds = transform_bounds(sar.crs, 'EPSG:4326',
+                                bounds.left, bounds.bottom,
+                                bounds.right, bounds.top)
+                    print(wgs84_bounds)
+                    boxes.append(wgs84_bounds)
+                    continue
+
                 building_ratio = detect_buildings(ghsl_path, sar, threshold = BUILDINGS_THRESHOLD)
                 print(f"Total building coverage for {dir_name}: {building_ratio}")
                 if building_ratio >= MIN_BUILDING_COVG:
@@ -190,12 +207,18 @@ def process_sar(sar_dir, target_dir, get_coverage):
                         wgs84_bounds = transform_bounds(sar.crs, 'EPSG:4326',
                                     bounds.left, bounds.bottom,
                                     bounds.right, bounds.top)
+                        print(wgs84_bounds)
                         boxes.append(wgs84_bounds)
                     else:
                         cut_patches(sar, dir_name, target_dir)
                 sar.close()
                 gc.collect()
                 logging.info(f"Final memory: {get_memory_mb():.0f}MB")
+    if boxes:
+        plot_coverage(boxes)
+    if not os.path.exists('used_sar_images.pkl'):
+        with open('used_sar_images.pkl', 'wb') as fp:
+            pickle.dump(used_images, fp)
 
 def convert_sar(sar_dir, dir_to_save):
     saved_imgs = set(os.listdir(dir_to_save))
@@ -226,7 +249,6 @@ def main():
     process_parser.add_argument('--sar_dir', type=str, required=True, help='Directory containing SAR image folders.')
     process_parser.add_argument('--target_dir', type=str, required=True, help='Directory to save processed patches.')
     process_parser.add_argument('--get_coverage', action='store_true', help='Flag to get global coverage of chosen SAR images.')
-
     args = parser.parse_args()
 
     if args.command == 'convert':
