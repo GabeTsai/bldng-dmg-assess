@@ -17,6 +17,8 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import csv
 from tqdm import tqdm
+import math
+import pickle
  
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(env_path)
@@ -59,10 +61,10 @@ def plot_coverage(boxes):
     plt.ylabel('Latitude')
     plt.savefig('sar_coverage.png')
 
-def process_sar_single_image(sar_dir, year, dir_name, ghsl, 
+def process_sar_single_image(capella_dir, year, dir_name, ghsl, 
                              get_coverage, target_dir, boxes, patch_metadata_path, 
                              image_coverage_path):
-    img_path = f'{sar_dir}/{year}/{dir_name}/{dir_name}.tif'
+    img_path = f'{capella_dir}/{year}/{dir_name}/{dir_name}.tif'
     logging.info(f"\nProcessing {img_path}")
     logging.info(f"Initial memory: {get_memory_mb():.0f}MB")
     
@@ -86,7 +88,7 @@ def process_sar_single_image(sar_dir, year, dir_name, ghsl,
     gc.collect()
     logging.info(f"Final memory: {get_memory_mb():.0f}MB")
 
-def process_sar(sar_dir, target_dir, get_coverage):
+def process_sar(capella_dir, target_dir, get_coverage):
     ghsl_path = f'{GHSL_DATA_FOLDER}/{GHSL_MASK}'
     patch_metadata_path = f'{SAR_DATA_FOLDER}/{constants.PATCH_METADATA_FILENAME}'
     image_coverage_path = f'{SAR_DATA_FOLDER}/{constants.PATCH_BLDNG_COVERAGE_FILENAME}'
@@ -99,10 +101,10 @@ def process_sar(sar_dir, target_dir, get_coverage):
     print('Processing SAR images')
     with rasterio.open(ghsl_path) as ghsl:
         for year in constants.SAR_YEARS:
-            dir_names = os.listdir(f'{sar_dir}/{year}')
+            dir_names = os.listdir(f'{capella_dir}/{year}')
             for dir_name in dir_names:
                 if 'geo' in dir_name.lower():
-                    process_sar_single_image(sar_dir, year, dir_name, ghsl, get_coverage, 
+                    process_sar_single_image(capella_dir, year, dir_name, ghsl, get_coverage, 
                                              target_dir, boxes, patch_metadata_path, image_coverage_path)
     if get_coverage:
         plot_coverage(boxes)
@@ -201,7 +203,8 @@ def cut_patches(img, img_name, sar_dir, patch_metadata_path,
             if np.sum(patch == 0) / patch.size < max_ratio:
                 log_patch = np.log10(patch, out=np.zeros_like(patch, dtype=np.float32), where=(patch!=0))
                 if np.max(log_patch) - np.min(log_patch[log_patch != 0]) > 0.5:
-                    patch_path = f'{sar_dir}/{img_name}_patch_{i}_{j}.tif'
+                    patch_name = f'{img_name}_patch_{i}_{j}.tif'
+                    patch_path = f'{sar_dir}/{patch_name}'
                     with rasterio.open(patch_path, 'w', driver='GTiff', width=patch_size, height=patch_size, count=1, dtype=np.float32, crs=img.crs, transform=img.window_transform(window)) as dst:
                         dst.write(log_patch, 1)
                     
@@ -212,11 +215,10 @@ def cut_patches(img, img_name, sar_dir, patch_metadata_path,
                     
                     with open(patch_metadata_path, mode='a', newline='') as f:
                         writer = csv.writer(f)
-                        writer.writerow([patch_path, lat_center, lon_center])
+                        writer.writerow([patch_name, lat_center, lon_center])
                     del patch
-                
-    gc.collect() 
-
+    gc.collect()   
+ 
 def convert_sar(sar_dir, dir_to_save):
     saved_imgs = set(os.listdir(dir_to_save))
     for img_name in tqdm(os.listdir(sar_dir)):
@@ -245,7 +247,7 @@ def main():
     process_parser = subparsers.add_parser('process', help='Process SAR images for building detection.')
     process_parser.add_argument('--sar_dir', type=str, required=True, help='Directory containing SAR image folders.')
     process_parser.add_argument('--target_dir', type=str, required=True, help='Directory to save processed patches.')
-    process_parser.add_argument('--get_coverage', action='store_true', help='Flag to get global coverage of chosen SAR images.')
+    process_parser.add_argument('--get_coverage', action='store_true', help='If set, only get coverage info without cutting patches.')
 
     args = parser.parse_args()
 

@@ -48,7 +48,7 @@ def create_class_finetune(bright_dir, data_dir):
         for img_name in os.listdir(os.path.join(bright_split_dir, 'post-event')):
             
             event_name = ''
-            for disaster in TRAIN_DIS:
+            for disaster in CLASSES:
                 if disaster in img_name:
                     event_name = disaster
                     break
