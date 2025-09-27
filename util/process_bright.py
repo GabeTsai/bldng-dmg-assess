@@ -166,7 +166,6 @@ def upload_to_hf(data_dir, repo_name = "BRIGHT-XView2Format"):
 def main():
     parser = argparse.ArgumentParser(description="Uploading BRIGHT w/ XView2 Format to HF.")
     subparsers = parser.add_subparsers(dest='command')
-    
 
     parser_rearrange_bright = subparsers.add_parser('rearrange_bright', help='Rearrange bright dataset to follow torchange xview2 structure')
     parser_rearrange_bright.add_argument('--bright_dir', type=str, required=True, help='Directory containing the bright dataset.')
