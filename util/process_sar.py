@@ -170,6 +170,24 @@ def detect_buildings(ghsl, sar, threshold = constants.BUILDINGS_THRESHOLD):
         
     return (building_pixel_count / valid_pixel_count) if valid_pixel_count > 0 else 0.0   
 
+def up_contrast_convert_to_uint8(img_uint16):
+    img = img_uint16.astype(np.float32)
+
+    mask = img > 0  # ignore zero values
+    if not np.any(mask):
+        return np.zeros_like(img, dtype=np.uint8)
+
+    img = np.maximum(img, 1.0)
+    img_db = 10 * np.log10(img)
+
+    vmin, vmax = np.percentile(img_db[mask], (1, 99))
+    img_db = np.clip(img_db, vmin, vmax)
+
+    img_norm = np.zeros_like(img_db)
+    img_norm[mask] = (img_db[mask] - vmin) / (vmax - vmin) * 255
+
+    return img_norm.astype(np.uint8)
+
 def cut_patches(img, img_name, sar_dir, patch_metadata_path, 
                 patch_size = constants.PATCH_SIZE, max_ratio = constants.MAX_RATIO):
     logging.info(f"Starting patches for {img_name} - Memory: {get_memory_mb():.0f}MB")
@@ -201,7 +219,7 @@ def cut_patches(img, img_name, sar_dir, patch_metadata_path,
                 
             # If patch doesn't have too many black pixels, and the image has enough contrast (isn't straight up noise), add patch 
             if np.sum(patch == 0) / patch.size < max_ratio:
-                log_patch = np.log10(patch, out=np.zeros_like(patch, dtype=np.float32), where=(patch!=0))
+                log_patch = up_contrast_convert_to_uint8(patch)
                 if np.max(log_patch) - np.min(log_patch[log_patch != 0]) > 0.5:
                     patch_name = f'{img_name}_patch_{i}_{j}.tif'
                     patch_path = f'{sar_dir}/{patch_name}'
