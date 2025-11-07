@@ -14,6 +14,7 @@ import psutil
 import logging
 import argparse
 import geopandas as gpd
+from shapely.geometry import Point
 import matplotlib.pyplot as plt
 import csv
 from tqdm import tqdm
@@ -70,6 +71,7 @@ def process_sar_single_image(capella_dir, year, dir_name, ghsl,
     
     sar = rasterio.open(img_path)
     building_ratio = detect_buildings(ghsl, sar, threshold = constants.BUILDINGS_THRESHOLD)
+    
     print(f"Total building coverage for {dir_name}: {building_ratio}")
     if building_ratio >= constants.MIN_BUILDING_COVG:
         if get_coverage:
@@ -82,7 +84,9 @@ def process_sar_single_image(capella_dir, year, dir_name, ghsl,
                 writer = csv.writer(f)
                 writer.writerow([dir_name, building_ratio])
         else:
-            cut_patches(sar, dir_name, target_dir, patch_metadata_path)
+            patch_metadata = cut_patches(sar, dir_name, target_dir)
+            gdf = gpd.GeoDataFrame(patch_metadata, crs= "EPSG:4326")
+            gdf.to_file(patch_metadata_path, driver="GeoJSON")
         
     sar.close()
     gc.collect()
@@ -188,12 +192,13 @@ def up_contrast_convert_to_uint8(img_uint16):
 
     return img_norm.astype(np.uint8)
 
-def cut_patches(img, img_name, sar_dir, patch_metadata_path, 
+def cut_patches(img, img_name, sar_dir,
                 patch_size = constants.PATCH_SIZE, max_ratio = constants.MAX_RATIO):
     logging.info(f"Starting patches for {img_name} - Memory: {get_memory_mb():.0f}MB")
     img_width, img_height = img.shape
     patches_processed = 0
     crs_is_geo = img.crs and img.crs.is_geographic
+    patch_metadata = []
 
     for i in range(0, img_height, patch_size):
         for j in range(0, img_width, patch_size):
@@ -230,13 +235,15 @@ def cut_patches(img, img_name, sar_dir, patch_metadata_path,
                     if patches_processed % 1000 == 0:
                         gc.collect()
                         logging.info(f"Processed {patches_processed} patches - Memory: {get_memory_mb():.0f}MB")
-                    
-                    with open(patch_metadata_path, mode='a', newline='') as f:
-                        writer = csv.writer(f)
-                        writer.writerow([patch_name, lat_center, lon_center])
+
+                    patch_metadata.append({
+                        "patch_name": patch_name,
+                        "geometry": Point(lon_center, lat_center)
+                    })
                     del patch
-    gc.collect()   
- 
+    gc.collect()
+    return patch_metadata
+
 def convert_sar(sar_dir, dir_to_save):
     saved_imgs = set(os.listdir(dir_to_save))
     for img_name in tqdm(os.listdir(sar_dir)):
