@@ -10,10 +10,12 @@ from dotenv import load_dotenv
 import config.constants as constants
 import os
 import gc 
+import glob
 import psutil
 import logging
 import argparse
 import geopandas as gpd
+import pandas as pd
 from shapely.geometry import Point
 import matplotlib.pyplot as plt
 import csv
@@ -84,9 +86,10 @@ def process_sar_single_image(capella_dir, year, dir_name, ghsl,
                 writer = csv.writer(f)
                 writer.writerow([dir_name, building_ratio])
         else:
+            # load in raster from global land polygon to generate land mask
             patch_metadata = cut_patches(sar, dir_name, target_dir)
             gdf = gpd.GeoDataFrame(patch_metadata, crs= "EPSG:4326")
-            gdf.to_file(patch_metadata_path, driver="GeoJSON")
+            gdf.to_parquet(f"{patch_metadata_path}/patch_metadata_{dir_name}.parquet", index=False)
         
     sar.close()
     gc.collect()
@@ -96,11 +99,8 @@ def process_sar(capella_dir, target_dir, get_coverage):
     ghsl_path = f'{GHSL_DATA_FOLDER}/{GHSL_MASK}'
     patch_metadata_path = f'{SAR_DATA_FOLDER}/{constants.PATCH_METADATA_FILENAME}'
     image_coverage_path = f'{SAR_DATA_FOLDER}/{constants.PATCH_BLDNG_COVERAGE_FILENAME}'
-    
-    with open(patch_metadata_path, mode='w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=constants.SAR_IMAGE_METADATA_HEADERS)
-        writer.writeheader()
 
+    # TODO: load in global land polygon (don't rasterize)
     boxes = []
     print('Processing SAR images')
     with rasterio.open(ghsl_path) as ghsl:
@@ -110,8 +110,16 @@ def process_sar(capella_dir, target_dir, get_coverage):
                 if 'geo' in dir_name.lower():
                     process_sar_single_image(capella_dir, year, dir_name, ghsl, get_coverage, 
                                              target_dir, boxes, patch_metadata_path, image_coverage_path)
+
+    files = glob.glob(f"{patch_metadata_path}/patch_metadata_*.parquet")
+    dfs = [gpd.read_parquet(f) for f in files]
+    merged = gpd.GeoDataFrame(pd.concat(dfs, ignore_index=True), crs="EPSG:4326")
+
+    merged.to_parquet(f"{patch_metadata_path}/patch_metadata_all.parquet", index=False)
+
     if get_coverage:
         plot_coverage(boxes)
+    
 
 def detect_buildings(ghsl, sar, threshold = constants.BUILDINGS_THRESHOLD):
     # Get bounds of SAR image in GHSL CRS(WGS84)
@@ -174,6 +182,10 @@ def detect_buildings(ghsl, sar, threshold = constants.BUILDINGS_THRESHOLD):
         
     return (building_pixel_count / valid_pixel_count) if valid_pixel_count > 0 else 0.0   
 
+def land_fraction(bbox_wgs_84, ):
+    """
+    General approach: load in raster givin bounding box of entire SAR scene
+    """
 def up_contrast_convert_to_uint8(img_uint16):
     img = img_uint16.astype(np.float32)
 
